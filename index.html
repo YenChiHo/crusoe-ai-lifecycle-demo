@@ -1,0 +1,1093 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Crusoe AI Lifecycle Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&family=Inter+Tight:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: booth-style dark stage in the Crusoe Managed RL demo's visual language. A top bar with numbered
+   pages; page 0 animates the whole flow on one lane map (workflow / MLflow / GPUs), pages 1-7 each explain
+   one step: how it works, a live view, the differentiators, and the code. Single dark theme by design. */
+:root{
+  color-scheme:dark;
+  --bg:#0F1011; --panel:#1B1D1E; --panel2:#232628; --line:#34373A; --ink:#FFFFFF; --muted:#BDBDBD; --dim:#8A8A8A;
+  --accent:#CEEB13; --on-accent:#1B2000; --slate:#7799B6; --gold:#CD881A; --green:#738564;
+  --cloud:#1C272C; --cloud-line:#3C5560;
+  --good:#6CC46F; --warn:#E3A33A; --bad:#F06464;
+  --g-sft:#5E93D6; --g-roll:#859B06; --g-train:#A47CDB; --g-inf:#D0782A; --g-idle:#2E3235;
+  --py-k:#C792EA; --py-f:#82AAFF; --py-s:#C3E88D; --py-c:#6A737D;
+  --f-display:"Roboto Mono",ui-monospace,Menlo,monospace;
+  --f-body:"Inter Tight","Helvetica Neue",Arial,system-ui,sans-serif;
+  --r:14px;
+}
+*{box-sizing:border-box}
+body{margin:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{background:var(--bg)}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.5}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--panel)}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3{font-family:var(--f-display);font-weight:400;margin:0;text-wrap:balance;letter-spacing:-.01em}
+h1{font-size:clamp(26px,3.4vw,40px);line-height:1.12}
+h2{font-size:clamp(20px,2.2vw,26px);line-height:1.2}
+h3{font-size:16px;font-weight:500;line-height:1.3}
+p{margin:0}
+code{font-family:var(--f-display);font-size:.9em}
+.eyebrow{font-family:var(--f-display);font-size:12.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--slate)}
+.hl{color:var(--accent)}
+.chip{font-family:var(--f-display);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--on-accent);background:var(--accent);padding:4px 10px;border-radius:999px;white-space:nowrap}
+.chip.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
+.chip.slate{background:var(--slate);color:#0B1216}
+.gut{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.inner{max-width:1400px;margin:0 auto}
+
+/* top bar */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--panel);border-bottom:1px solid var(--line)}
+.top .inner{display:flex;align-items:center;gap:18px;padding-block:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:14px}
+.brand img{height:26px;display:block}
+.brand .prod{font-family:var(--f-display);font-weight:700;font-size:15px;padding-left:14px;border-left:1px solid var(--line);white-space:nowrap}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;margin-left:auto}
+.tab{font-family:var(--f-display);font-size:12.5px;letter-spacing:.05em;text-transform:uppercase;padding:5px 12px 5px 5px;border-radius:999px;color:var(--muted);display:inline-flex;align-items:center;gap:8px;border:1.5px solid transparent;white-space:nowrap}
+.tab .num{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:11.5px;background:var(--panel2);color:var(--muted)}
+.tab:hover{color:var(--ink);border-color:var(--line)}
+.tab[aria-current="page"]{background:var(--accent);color:var(--on-accent)}
+.tab[aria-current="page"] .num{background:var(--on-accent);color:var(--accent)}
+.tourbtn{font-family:var(--f-display);font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;border:1.5px solid var(--line);border-radius:999px;padding:5px 12px;color:var(--muted)}
+.tourbtn[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+
+.ctx{border-bottom:1px solid var(--line);background:var(--bg)}
+.ctx .inner{display:flex;flex-wrap:wrap;gap:10px 26px;padding-block:10px;align-items:center}
+.ctl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-width:0}
+.ctl .eyebrow{font-size:11px;color:var(--dim)}
+.seg{display:flex;flex-wrap:wrap;gap:2px;background:var(--panel);padding:3px;border-radius:999px;border:1px solid var(--line)}
+.seg button{padding:4px 11px;border-radius:999px;font-size:13.5px;color:var(--muted)}
+.seg button:hover{color:var(--ink)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg);font-weight:600}
+
+main .inner{padding-block:26px 40px;display:flex;flex-direction:column;gap:26px}
+.page[hidden]{display:none!important}
+.page{display:flex;flex-direction:column;gap:26px}
+
+/* page head */
+.phead{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:end}
+.phead > div{display:flex;flex-direction:column;gap:10px;min-width:0}
+.phead .lede{color:var(--muted);font-size:17px;max-width:72ch}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.btn{text-decoration:none;display:inline-block;font-family:var(--f-display);font-size:13px;letter-spacing:.06em;text-transform:uppercase;padding:10px 16px;border-radius:999px;border:1.5px solid var(--line);color:var(--ink);white-space:nowrap}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:700}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.cardhead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.sim{font-family:var(--f-display);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);border:1px dashed var(--line);padding:2px 8px;border-radius:999px}
+.two{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:18px;align-items:start}
+.three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.muted{color:var(--muted)} .dim{color:var(--dim)}
+.small{font-size:13.5px}
+
+/* scenario strip */
+.scen{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:18px;align-items:start;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px}
+.scen > div{display:flex;flex-direction:column;gap:4px;min-width:0}
+.facts{display:grid;grid-template-columns:auto 1fr;gap:3px 14px;font-size:13.5px;margin:0}
+.facts dt{color:var(--dim);font-family:var(--f-display);font-size:11.5px;padding-top:2px;text-transform:uppercase;letter-spacing:.06em}
+.facts dd{margin:0;min-width:0;overflow-wrap:anywhere}
+
+/* ===== overview flow map ===== */
+.flowwrap{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:flex;flex-direction:column;gap:14px}
+.flow{position:relative;display:grid;grid-template-columns:118px minmax(0,1fr) 40px minmax(0,1fr) 40px minmax(0,1fr) 40px minmax(0,1fr) 40px minmax(0,1fr);grid-template-rows:56px auto auto auto;row-gap:10px}
+.lanebg{grid-column:1/-1;border-radius:10px}
+.lanebg.ml{grid-row:3;background:var(--cloud);border:1px solid var(--cloud-line)}
+.lanebg.gp{grid-row:4;background:var(--panel2)}
+.lanelab{grid-column:1;font-family:var(--f-display);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);align-self:center;padding-left:12px;z-index:1;line-height:1.35}
+.lanelab b{display:block;color:var(--ink);font-weight:500;font-size:12px}
+.st{all:unset;box-sizing:border-box;cursor:pointer;grid-row:2;display:flex;flex-direction:column;gap:5px;padding:12px;border:1.5px solid var(--line);border-radius:12px;background:var(--bg);min-width:0;position:relative;transition:border-color .3s,box-shadow .3s}
+.st:hover{border-color:var(--muted)}
+.st:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.st .n{font-family:var(--f-display);font-size:11px;color:var(--dim)}
+.st .t{font-family:var(--f-display);font-size:15px;font-weight:500;line-height:1.2}
+.st .s{font-size:12.5px;color:var(--muted);line-height:1.3}
+.st.sel{border-color:var(--ink)}
+.st.run{border-color:var(--accent);box-shadow:0 0 0 3px rgba(206,235,19,.18)}
+.st.done .n::after{content:" ✓";color:var(--accent)}
+.pill{align-self:flex-start;font-family:var(--f-display);font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:2px 7px;border-radius:999px;border:1px solid var(--line);color:var(--dim)}
+.st.run .pill{border-color:var(--accent);color:var(--accent)}
+.st.done .pill{border-color:var(--green);color:var(--muted)}
+.conn{grid-row:2;position:relative;align-self:center;height:2px;background:var(--line)}
+.conn::after{content:"";position:absolute;right:-1px;top:-4px;border:5px solid transparent;border-left:6px solid var(--line);border-right:0}
+.conn.lit{background:var(--accent)}
+.conn.lit::after{border-left-color:var(--accent)}
+.tok{position:absolute;top:50%;left:0;transform:translate(-50%,-50%);font-family:var(--f-display);font-size:10.5px;background:var(--accent);color:var(--on-accent);padding:3px 8px;border-radius:999px;white-space:nowrap;opacity:0;z-index:3;pointer-events:none}
+.tok:not(.go){display:none}
+.tok.go{animation:tokx 1.1s ease-in-out forwards}
+@keyframes tokx{0%{left:0;opacity:0}15%{opacity:1}85%{opacity:1}100%{left:100%;opacity:0}}
+.mlc{grid-row:3;z-index:1;padding:10px 6px;font-family:var(--f-display);font-size:11.5px;color:var(--slate);display:flex;flex-direction:column;gap:3px;opacity:.35;transition:opacity .4s;min-width:0}
+.mlc b{color:var(--ink);font-weight:500;overflow-wrap:anywhere}
+.mlc.on{opacity:1}
+.mlc.drop b{animation:drop .6s ease-out}
+@keyframes drop{0%{transform:translateY(-14px);opacity:0}100%{transform:none;opacity:1}}
+.gpc{grid-row:4;z-index:1;padding:10px 6px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.mini{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:3px;max-width:180px}
+.mini i{display:block;aspect-ratio:1;border-radius:2px;background:var(--g-idle);transition:background .5s}
+.gpc span{font-family:var(--f-display);font-size:10.5px;color:var(--dim)}
+.arc{position:absolute;inset:0;pointer-events:none;z-index:2;overflow:visible}
+.arc path.l{stroke:var(--line);transition:stroke .4s}
+.arc.lit path.l{stroke:var(--accent)}
+.arc text{font-family:var(--f-display);font-size:11px;fill:var(--muted)}
+.arc.lit text{fill:var(--accent)}
+.legendrow{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+.dot{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+
+.narr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,.8fr);gap:18px;align-items:start}
+.narr .k{font-family:var(--f-display);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);display:block;margin-bottom:4px}
+.narr > div{min-width:0}
+.handoff{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+
+/* results bars */
+.bars{display:flex;flex-direction:column;gap:10px}
+.bar{display:grid;grid-template-columns:110px 1fr 64px;gap:12px;align-items:center;font-size:14px}
+.bar .trk{height:18px;background:var(--panel2);border-radius:4px;overflow:hidden}
+.bar .fill{height:100%;background:var(--dim);border-radius:0 4px 4px 0;width:0;transition:width 1s cubic-bezier(.2,.7,.2,1)}
+.bar.best .fill{background:var(--accent)}
+.bar .val{font-family:var(--f-display);font-variant-numeric:tabular-nums;text-align:right}
+.bar.best .val{color:var(--accent)}
+
+/* step pages */
+.how{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.pipe{display:flex;gap:0;align-items:stretch;overflow-x:auto;padding-bottom:4px}
+.pbox{flex:1 1 0;min-width:150px;background:var(--bg);border:1.5px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:5px;transition:border-color .3s}
+.pbox .n{font-family:var(--f-display);font-size:11px;color:var(--dim)}
+.pbox .t{font-family:var(--f-display);font-size:14px;font-weight:500}
+.pbox .s{font-size:12.5px;color:var(--muted)}
+.pbox code{color:var(--slate);font-size:11.5px;overflow-wrap:anywhere}
+.pbox.on{border-color:var(--accent)}
+.parr{flex:0 0 26px;display:grid;place-items:center;color:var(--dim)}
+.diff{display:flex;flex-direction:column;gap:10px;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);min-width:0}
+.diff h3{color:var(--accent)}
+.diff .vs{font-size:13px;color:var(--dim);border-top:1px solid var(--line);padding-top:8px}
+.diff .vs b{color:var(--muted);font-weight:500;font-family:var(--f-display);font-size:11px;letter-spacing:.08em;text-transform:uppercase;display:block}
+.callouts{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.callout{border-left:3px solid var(--slate);padding:10px 14px;background:var(--panel);border-radius:0 10px 10px 0;font-size:14.5px}
+.callout.ev{border-left-color:var(--accent)}
+.callout .k{font-family:var(--f-display);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);display:block;margin-bottom:3px}
+.pnav{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:16px}
+
+/* tiles, records, tables */
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.tile{background:var(--panel2);border-radius:10px;padding:10px 12px;min-width:0}
+.tile .v{font-family:var(--f-display);font-size:22px;font-weight:500;font-variant-numeric:tabular-nums;line-height:1.15}
+.tile .l{font-size:12.5px;color:var(--muted)}
+pre{margin:0;font-family:var(--f-display);font-size:12.5px;line-height:1.6}
+.rec{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;max-height:260px;overflow:auto}
+.rec pre{white-space:pre-wrap;word-break:break-word}
+.tablewrap{overflow-x:auto}
+table.t{width:100%;border-collapse:collapse;font-size:13.5px}
+table.t th{font-family:var(--f-display);font-weight:500;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);text-align:left;padding:6px;border-bottom:1px solid var(--line)}
+table.t td{padding:7px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+table.t td.num,table.t th.num{text-align:right;font-family:var(--f-display);font-variant-numeric:tabular-nums;white-space:nowrap}
+table.t tr:last-child td{border-bottom:0}
+.ok{color:var(--good)}.partial{color:var(--warn)}.no{color:var(--bad)}
+
+/* charts */
+.chartbox{position:relative}
+.chart{width:100%;height:auto;display:block;overflow:visible}
+.chart text{font-family:var(--f-display);font-size:10.5px;fill:var(--dim)}
+.chart .grid{stroke:var(--line);stroke-width:1}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);font-family:var(--f-display);font-size:11.5px;padding:4px 8px;border-radius:6px;white-space:nowrap;transform:translate(-50%,-125%);z-index:4}
+
+/* code */
+.code{background:#0B0C0D;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;min-width:0}
+.code .cbar{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);gap:8px;flex-wrap:wrap}
+.code .fn{font-family:var(--f-display);font-size:12px;color:var(--dim)}
+.code .cp{border:1px solid var(--line);font-size:12px;padding:3px 10px;border-radius:999px;color:var(--muted);font-family:var(--f-display)}
+.code pre{color:#E6E6E6;padding:14px 16px;overflow-x:auto;white-space:pre}
+.code .k{color:var(--py-k)}.code .f{color:var(--py-f)}.code .s{color:var(--py-s)}.code .c{color:var(--py-c)}
+.codenote{font-size:12.5px;color:var(--dim);padding:0 16px 12px}
+
+/* RL loop */
+.loopgrid{display:grid;grid-template-columns:minmax(0,.9fr) 92px minmax(0,1.2fr);gap:0;align-items:stretch}
+.side{display:flex;flex-direction:column;gap:10px;min-width:0}
+.side .hd{font-family:var(--f-display);font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.ybox{background:var(--bg);border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;grid-template-columns:24px 1fr;gap:4px 10px;transition:border-color .25s,background .25s}
+.ybox .i{grid-row:span 2;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-family:var(--f-display);font-size:12px;font-weight:700;background:var(--panel2);color:var(--muted)}
+.ybox .t{font-family:var(--f-display);font-size:13.5px;font-weight:500}
+.ybox .s{font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
+.ybox.on{border-color:var(--accent);background:rgba(206,235,19,.06)}
+.ybox.on .i{background:var(--accent);color:var(--on-accent)}
+.wire{display:flex;flex-direction:column;justify-content:center;gap:22px;padding:0 6px}
+.w{font-family:var(--f-display);font-size:10.5px;color:var(--dim);text-align:center;display:flex;flex-direction:column;gap:2px;align-items:center;transition:color .25s}
+.w .ln{width:100%;height:2px;background:var(--line);position:relative;transition:background .25s}
+.w.r .ln::after{content:"";position:absolute;right:-1px;top:-4px;border:5px solid transparent;border-left:6px solid var(--line);border-right:0}
+.w.l .ln::before{content:"";position:absolute;left:-1px;top:-4px;border:5px solid transparent;border-right:6px solid var(--line);border-left:0}
+.w.on{color:var(--accent)} .w.on .ln{background:var(--accent)}
+.w.on.r .ln::after{border-left-color:var(--accent)} .w.on.l .ln::before{border-right-color:var(--accent)}
+.cloud{background:var(--cloud);border:1.5px solid var(--cloud-line);border-radius:var(--r);padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.cloud .hd{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center}
+.cbox{background:var(--bg);border:1.5px solid var(--cloud-line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:3px;transition:border-color .25s,background .25s}
+.cbox .t{font-family:var(--f-display);font-size:13.5px;font-weight:500;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.cbox .s{font-size:12.5px;color:var(--muted)}
+.cbox code{color:var(--slate)}
+.cbox.on{border-color:var(--accent);background:rgba(206,235,19,.06)}
+.cbox.on code{color:var(--accent)}
+.vw{font-family:var(--f-display);font-size:10.5px;color:var(--dim);display:flex;justify-content:space-between;gap:8px;padding:0 12px;flex-wrap:wrap}
+.vw span{transition:color .25s}
+.vw span.on{color:var(--accent)}
+.stepline{display:flex;gap:14px;align-items:baseline;flex-wrap:wrap;font-family:var(--f-display)}
+.stepline .big{font-size:28px;font-weight:500;font-variant-numeric:tabular-nums}
+.stepline .call{font-size:13px;color:var(--accent);background:rgba(206,235,19,.08);border:1px solid rgba(206,235,19,.35);padding:3px 10px;border-radius:999px}
+.group{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px;align-items:end;height:92px;border-bottom:1px solid var(--line);position:relative}
+.group i{display:block;border-radius:4px 4px 0 0;background:var(--dim);transition:height .3s}
+.group i.pos{background:var(--accent)}
+.group .mean{position:absolute;left:0;right:0;border-top:1.5px dashed var(--muted)}
+.glab{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px;font-family:var(--f-display);font-size:10.5px;color:var(--dim);text-align:center}
+.flash{animation:flash 1s}
+@keyframes flash{0%{border-color:var(--accent);background:rgba(206,235,19,.18)}}
+
+/* serve */
+.chat{display:flex;flex-direction:column;gap:8px}
+.msg{padding:10px 12px;border-radius:10px;font-size:14px}
+.msg.u{background:var(--panel2)}
+.msg.a{border:1px solid var(--line);min-height:70px;background:var(--bg)}
+.msg .who{font-family:var(--f-display);font-size:11px;color:var(--dim);display:block;margin-bottom:4px}
+.msg pre{white-space:pre-wrap;word-break:break-word}
+.caret::after{content:"▍";color:var(--accent);animation:blink .8s infinite}
+@keyframes blink{50%{opacity:0}}
+.meta{display:flex;gap:14px;flex-wrap:wrap;font-family:var(--f-display);font-size:12px;color:var(--muted)}
+.claim{font-size:14px;color:var(--muted);border-left:3px solid var(--accent);padding:6px 12px}
+.claim b{color:var(--ink);font-weight:600}
+.opt{display:flex;flex-direction:column;gap:8px;padding:16px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);min-width:0}
+.opt.pick{border-color:var(--accent)}
+.opt ul{margin:0;padding-left:18px;color:var(--muted);font-size:14px;display:flex;flex-direction:column;gap:4px}
+
+/* platform */
+.fleet{display:grid;grid-template-columns:repeat(16,minmax(0,1fr));gap:4px}
+.fleet i{display:block;aspect-ratio:1;border-radius:3px;background:var(--g-idle);transition:background .5s}
+.pitch{width:100%;border-collapse:collapse;font-size:14px;min-width:820px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.pitch th{text-align:left;font-family:var(--f-display);font-weight:500;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);padding:10px 12px;border-bottom:1px solid var(--line);background:var(--panel2)}
+.pitch td{padding:12px;border-bottom:1px solid var(--line);vertical-align:top}
+.pitch tr:last-child td{border-bottom:0}
+.pitch td:first-child{font-family:var(--f-display);font-weight:500;white-space:nowrap}
+.pitch td.diy{color:var(--dim)}
+.pitch td.lens{color:var(--accent)}
+.ros{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+.beat{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:6px}
+.beat .tm{font-family:var(--f-display);font-size:12px;color:var(--accent)}
+.beat p{font-size:14px;color:var(--muted)}
+.links{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+.lnk{display:flex;flex-direction:column;gap:6px;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);text-decoration:none;color:var(--ink)}
+.lnk:hover{border-color:var(--accent)}
+.lnk span{font-family:var(--f-display);font-size:12.5px;color:var(--accent);overflow-wrap:anywhere}
+.lnk p{font-size:14px;color:var(--muted)}
+.foot{font-size:12.5px;color:var(--dim);border-top:1px solid var(--line);padding-top:14px;max-width:110ch}
+.keys{font-family:var(--f-display);font-size:11.5px;color:var(--dim)}
+kbd{font-family:var(--f-display);font-size:11px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel)}
+
+@media (max-width:1080px){
+  .tabs{margin-left:0;width:100%}
+  .two,.narr,.scen,.phead{grid-template-columns:1fr}
+  .three{grid-template-columns:1fr}
+  .callouts{grid-template-columns:1fr}
+}
+@media (max-width:900px){
+  .flow{grid-template-columns:1fr;grid-template-rows:none;row-gap:0}
+  .flow .lanebg,.flow .lanelab,.flow .arc{display:none}
+  .flow > *{grid-column:1!important;grid-row:auto!important}
+  .st{margin-top:10px}
+  .mlc,.gpc{background:var(--panel2);flex-direction:row;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 12px;border-radius:0}
+  .mlc{background:var(--cloud);border-radius:0;opacity:1}
+  .gpc{border-radius:0 0 12px 12px}
+  .mini{max-width:120px}
+  .conn{height:26px;width:2px;justify-self:center;margin-top:10px}
+  .conn::after{right:auto;left:-4px;top:auto;bottom:-1px;border:5px solid transparent;border-top:6px solid var(--line);border-bottom:0}
+  .conn.lit::after{border-top-color:var(--accent);border-left-color:transparent}
+  .tok.go{animation:toky 1.1s ease-in-out forwards}
+  @keyframes toky{0%{top:0;opacity:0}15%{opacity:1}85%{opacity:1}100%{top:100%;opacity:0}}
+  .tok{left:50%}
+  .loopgrid{grid-template-columns:1fr}
+  .wire{flex-direction:row;padding:10px 0;gap:10px}
+  .wire .w{flex:1}
+  .fleet{grid-template-columns:repeat(8,minmax(0,1fr))}
+}
+@media (max-width:520px){.tiles{grid-template-columns:1fr 1fr}.bar{grid-template-columns:80px 1fr 54px}.brand .prod{display:none}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<header class="top gut">
+  <div class="inner">
+    <div class="brand"><img src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyBpZD0iTGF5ZXJfMSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB2ZXJzaW9uPSIxLjEiIHZpZXdCb3g9IjAgMCAxMjAwIDI4NyI+CiAgPCEtLSBHZW5lcmF0b3I6IEFkb2JlIElsbHVzdHJhdG9yIDI5LjYuMSwgU1ZHIEV4cG9ydCBQbHVnLUluIC4gU1ZHIFZlcnNpb246IDIuMS4xIEJ1aWxkIDkpICAtLT4KICA8ZGVmcz4KICAgIDxzdHlsZT4KICAgICAgLnN0MCB7CiAgICAgICAgZmlsbDogI2ZmZjsKICAgICAgfQogICAgPC9zdHlsZT4KICA8L2RlZnM+CiAgPHBhdGggY2xhc3M9InN0MCIgZD0iTTExNTkuMyw0My43bC02LjEtNS44Yy0xLjMtMS4zLTIuNy0uOC0zLDFsLTMuMiwxNi44Yy0uMywxLjguNCw0LjIsMS44LDUuNWwzLjQsMy40YzEuMiwxLjMsMi43LDEsMy4zLS43bDUuMS0xNC43Yy42LTEuNywwLTQuMi0xLjItNS41aDAsMFpNMTExNi4xLDEzLjJsLTYuMy0yLjhjLTEuNy0uNy0yLjguMi0yLjUsMmwzLjcsMjIuOGMuMywxLjgsMS45LDMuOCwzLjYsNC41bDMuOCwxLjRjMS43LjcsMi45LS4yLDIuOC0ybC0xLjctMjEuNGMtLjItMS44LTEuNi0zLjktMy4yLTQuN2gwWk0xMDAzLjQsMTAuMmwtNi43LDIuOWMtMS42LjctMS44LDIuMy0uNCwzLjRsMzIuNywyNi42YzEuNCwxLjEsMy45LDEuNCw1LjUuN2wzLjYtMS44YzEuNy0uNywxLjktMi4zLjYtMy42bC0yOS44LTI3LjJjLTEuMy0xLjItMy44LTEuNy01LjUtMWgwWk0xMDA0LjgsNjEuNGwtNDMuMi0yMS40Yy0xLjYtLjgtNC0uNC01LjMuOWwtNSw1LjJjLTEuMiwxLjMtLjksMywuOCwzLjdsNDUuNSwyMGMxLjYuNyw2LjktMy4zLDguMS00LjYsMS4yLTEuMy45LTMtLjctMy44aDBaTTkyNC41LDg3LjVsLTIuNiw2LjZjLS42LDEuNy40LDMuMiwyLjEsMy40bDU2LjEsNC43YzEuOC4yLDMuOC0xLjEsNC40LTIuOGwxLjMtMy42Yy43LTEuNy0uMi0zLjItMi0zLjVsLTU0LjktNy40Yy0xLjgtLjItMy44LjktNC42LDIuNmgwczAsMCwwLDBaTTEwODAuOSwzMC4zbC0xNC42LTI3LjJjLS45LTEuNi0zLTIuOS00LjktM2gtNy41Yy0xLjgsMC0yLjUsMS4yLTEuNSwyLjdsMTcuNCwyNy44YzEsMS41LDcuNywyLjUsOS40LDIuNXMyLjUtMS4yLDEuNy0yLjhoMFpNOTEzLjMsMTM5Ljd2Ny44YzAsMS44LDEuNiwzLDMuNCwyLjdsNTguNy0xMC43YzEuOC0uMywzLjItMiwzLjItMy45di00LjJjMC0xLjgtMS40LTMuMS0zLjItMi45bC01OC43LDcuNWMtMS44LjItMy4zLDEuOS0zLjQsMy43aDBaTTExMjguMSw4Ny41bC0zLjUtMi41Yy0uOS0uNi0xLjctLjItMS43LjlsLS4zLDcuMmMwLDEuMS43LDIuNCwxLjUsM2wyLjQsMS44Yy44LjcsMS42LjMsMS44LS43bDEtNi42Yy4yLTEtLjQtMi40LTEuMi0zLjFoMFpNMTA4MS40LDc5LjhsLTQuMSwxLjdjLTEsLjQtMS4xLDEuNC0uMywyLjFsMTIsMTAuM2MuOC43LDIuMi44LDMuMS4zbDIuNi0xLjJjMS0uNCwxLjItMS4zLjQtMi4xbC0xMC42LTEwLjRjLS44LS43LTIuMi0xLTMuMi0uN2gwczAsMCwwLDBaTTEwNTgsMTAxLjRjLTEtLjMtMS40LTEuMy0uOS0yLjJsMi41LTMuOGMuNi0uOSwxLjktMS4zLDIuOS0uOWwxOC40LDYuNWMxLC40LDEuMywxLjQuOCwyLjNsLTEuMywyLjVjLS41LjktMS44LDEuNS0yLjgsMS4ybC0xOS43LTUuNVpNMTA3NS43LDEyMC43YzAsMS4xLS45LDItMiwybC0yMi40LDEuMmMtMS4xLDAtMS45LS44LTEuOC0xLjhsLjUtNC4zYy4yLTEsMS4yLTEuOSwyLjItMS45bDIxLjkuM2MxLjEsMCwxLjkuOSwxLjgsMmwtLjIsMi42aDBaTTExMDMsNzcuM2MtMS0uMS0xLjYuNi0xLjMsMS42bDMuNSwxMGMuMywxLDEuNSwxLjksMi41LDEuOWwyLjkuMmMxLC4xLDEuNy0uNiwxLjQtMS42bC0yLjUtOS4zYy0uMy0xLTEuNC0yLTIuNC0yLjJsLTQuMS0uNmgwWk0xMDI1LjcsNjkuNWwyMy4xLDExLjdjMS4xLjUsMi44LjMsMy43LS41bDIuNS0yLjFjMS0uOC45LTEuOS0uMi0yLjVsLTIxLjgtMTIuOGMtMS4xLS42LTIuOC0uNS0zLjcuM2wtNCwzLjRjLS45LjgtLjgsMS45LjMsMi41aDAsMFpNMTEzOS41LDgyLjVsMi44LTExLjljLjMtMS4yLS4yLTIuOS0xLjItMy43bC00LjUtMy44Yy0xLS44LTEuOS0uNC0yLC45bC0xLjIsMTNjLS4xLDEuMy41LDIuOSwxLjQsMy44bDIuNiwyLjNjLjkuOSwxLjkuNiwyLjItLjZoMFpNMTE1OSw4OC45bC0zLjItNWMtLjctMS4xLTEuOS0xLjEtMi44LS4ybC02LjMsNy4yYy0uOC45LS45LDIuNi0uMywzLjZsMS40LDIuM2MuNiwxLjEsMS45LDEuNCwzLC42bDcuNC01LjNjMS0uNywxLjMtMi4yLjctMy4zaDBaTTExMjAuMiw1My4ybC00LjgtMmMtMS4xLS41LTEuOSwwLTEuNywxLjNsMi40LDE0LjljLjIsMS4yLDEuMywyLjcsMi41LDMuMWwzLjIsMS41YzEuMS41LDIsMCwxLjgtMS4ybC0xLjEtMTQuNGMwLTEuMi0xLjEtMi43LTIuMi0zLjJoMFpNMTA0NS4yLDUzLjdjLTEuMS41LTEuMiwxLjYtLjMsMi40bDE4LjIsMTQuOGMuOS44LDIuNywxLDMuOC41bDMuMS0xLjRjMS4xLS41LDEuMy0xLjYuNC0yLjRsLTE2LjgtMTUuM2MtLjktLjgtMi42LTEuMi0zLjgtLjdsLTQuNywyLjFoMFpNMTA0MC45LDk0LjFsMS44LTIuNmMuNy0xLC4zLTIuMS0uOS0yLjVsLTI2LjUtOC4xYy0xLjItLjQtMi43LjItMy40LDEuMmwtMi42LDRjLS43LDEuMS0uMiwyLjIsMSwyLjVsMjcuMyw2LjljMS4yLjMsMi43LS4zLDMuNC0xLjRoMFpNMTA5Ny4zLDQ2LjFsLTQuNS0uNmMtMS4yLS4yLTEuOS43LTEuNCwxLjlsNi4zLDE2Yy41LDEuMiwxLjgsMi4zLDMuMSwyLjRsMi45LjNjMS4yLjIsMS45LS42LDEuNi0xLjhsLTUtMTUuN2MtLjQtMS4yLTEuNy0yLjMtMi45LTIuNWgwWk0xMDg3LjIsNjMuNmwtMTAuMy0xNi40Yy0uNy0xLjEtMi4yLTEuOC0zLjUtMS42bC00LjcuN2MtMS4yLjItMS42LDEuMi0uOSwyLjJsMTEuNiwxNi40Yy43LDEsMi4zLDEuNywzLjUsMS41bDMuMi0uNWMxLjItLjIsMS43LTEuMSwxLTIuMlpNMTAyOS4xLDEyMS44bC0zMC41LDMuOWMtMS4yLjItMi4zLDEuMy0yLjMsMi42djUuM2MtLjEsMS4zLjksMi4xLDIuMSwxLjlsMzAuNS01LjZjMS4yLS4yLDIuMy0xLjQsMi4zLTIuN3YtMy4zYy4yLTEuMy0uOC0yLjItMi0yaDBaTTk5OS43LDE1N2MuNCwxLjIsMS42LDEuOCwyLjgsMS40bDI5LjQtMTAuN2MxLjItLjQsMS45LTEuOCwxLjUtM2wtLjgtMy4yYy0uMy0xLjItMS41LTEuOS0yLjctMS42bC0yOS44LDkuM2MtMS4yLjQtMS45LDEuNi0xLjYsMi45bDEuMiw0LjloMFpNMTAwMy43LDEwMi4yYy0xLjIsMC0yLjYuOC0yLjksMmwtMS41LDQuNWMtLjMsMS4yLjQsMi4yLDEuNywyLjNsMjkuOCwxLjFjMS4yLDAsMi42LS45LDIuOS0yLjFsMS0zYy40LTEuMi0uMi0yLjItMS41LTIuM2wtMjkuNS0yLjVoMFpNMTE5OS40LDE0MC44YzAtMS44LTEuNC0zLjktMy00LjdsLTE0LTYuOGMtMS42LS44LTIuOSwwLTIuOCwxLjl2NC44YzAsMS44LDEuMiw0LjEsMi43LDUuMWwxNC4yLDkuNmMxLjUsMSwyLjguNCwyLjgtMS40bC4yLTguNGgwYzAsMCwwLDAsMCwwWk0xMTkwLjUsMTkyLjhjLjYtMS43LjItNC4yLTEtNS42bC0xMy45LTE2LjNjLTEuMi0xLjQtMi43LTEuMS0zLjMuNmwtMS43LDMuN2MtLjcsMS43LS40LDQuMi42LDUuN2wxMy41LDE4LjhjMS4xLDEuNSwyLjUsMS4zLDMuMi0uNGwyLjUtNi40aDBaTTExMTMsMjc0LjZjMS43LS43LDMuMS0yLjgsMy4yLTQuNmwxLjgtNDAuM2MwLTEuOC0xLjItMi44LTIuOS0yLjFsLTMuOCwxLjNjLTEuNy42LTMuMiwyLjYtMy41LDQuNGwtNC4zLDQxLjljLS4yLDEuOCwxLjEsMi44LDIuNywyLjFsNi44LTIuN2gwWk0xMDc3LjcsMjM3LjRjLjYtMS43LS40LTMuMS0yLjEtMy4yLTEuOCwwLTguMy44LTguOSwyLjVsLTE4LDQ2LjJjLS43LDEuNy4zLDMuMSwyLjEsMy4yaDcuM2MxLjguMSwzLjgtMS4zLDQuMy0zbDE1LjQtNDUuN2gwWk0xMDAyLjUsMjc1LjdjMS43LjcsMy45LDAsNS0xLjRsMzMuNi00NC4xYzEuMS0xLjQuNi0zLjItMS4xLTMuOWwtMy41LTEuNmMtMS43LS43LTQtLjItNS4xLDEuMmwtMzYuNCw0M2MtMS4yLDEuNC0uOCwzLjEuOSwzLjlsNi41LDIuOGgwWk0xMTUzLjUsMjA1LjZjLS41LTEuNy0yLTIuMS0zLjItLjgtMS4yLDEuMy01LjMsNi43LTQuOSw4LjRsNy4zLDMyYy40LDEuOCwxLjgsMi4yLDMuMS45bDUuMi01LjRjMS4yLTEuMywxLjgtMy44LDEuMy01LjZsLTguOS0yOS42Wk05NTcuNiwyNDYuN2MxLjMsMS4zLDMuNiwxLjQsNSwuMmw0Ni44LTM2LjNjMS40LTEuMSwxLjUtMywuMi00LjNsLTIuOS0zYy0xLjMtMS4zLTMuNS0xLjUtNS0uNWwtNDkuMSwzMy45Yy0xLjUsMS0xLjcsMi45LS40LDQuMmw1LjUsNS42aDBaTTExNDYuNSwxMzEuOGMuMS0xLS41LTIuNC0xLjMtMy4xbC01LjMtNGMtLjgtLjYtMS42LS4zLTEuNy44bC0uNSwzYy0uMiwxLC4yLDIuNSwxLDMuMmw1LjMsNC45Yy44LjcsMS42LjUsMS44LS42bC43LTQuMmgwWk0xMTE4LjgsMTcwLjJjLjktLjUsMS44LTEuNywxLjgtMi43di0xNC45YzAtMS4xLS43LTEuNi0xLjctMS4ybC0yLjYsMWMtMSwuMy0xLjksMS40LTIsMi41bC0xLjIsMTUuOGMwLDEuMS43LDEuNiwxLjcsMS4zbDQuMS0xLjdoMFpNMTA5Ny4xLDE1My43Yy41LS45LDEuOC0xLjQsMi44LTEuMWgwbDIuNy44YzEsLjIsMS41LDEuMiwxLjEsMi4ybC04LjQsMTcuNmMtLjQsMS0xLjcsMS42LTIuNywxLjRsLTQuNS0uOWMtMS0uMy0xLjUtMS4zLS45LTIuMmwxMC0xNy44aDBaTTEwODcuOCwxNDcuMWMuOC43LjksMS45LjEsMi42bC0xNS4zLDE1LjdjLS43LjgtMi4xLjktMi45LjJsLTMuNC0yLjdjLS44LS43LS44LTEuOSwwLTIuNmwxNi43LTE1Yy44LS43LDItLjcsMi44LDBsMiwxLjdoMFpNMTEzOC40LDE1My40Yy42LS45LjctMi40LjEtMy4zbC00LjgtOC4zYy0uNS0uOS0xLjUtMS0yLjEtLjJsLTEuOSwyLjJjLS43LjgtMSwyLjItLjUsMy4xbDQuNiw5LjVjLjUsMSwxLjQsMSwyLjEuMmwyLjUtMy40aDBaTTEwODYuOCwyMTYuOWMtLjQsMS4yLjMsMi4xLDEuNiwybDUuMi0uNGMxLjItLjIsMi41LTEuMiwyLjgtMi40bDYuMy0yNC40Yy4zLTEuMi0uNC0yLjEtMS43LTEuOWwtMy4zLjNjLTEuMiwwLTIuNiwxLjEtMi45LDIuM2wtOCwyNC42aDAsMFpNMTE1OCwxMjcuM2MtMS4xLS43LTItLjItMiwxLjFsLS4yLDMuNGMwLDEuMy43LDIuOSwxLjcsMy43bDEwLjEsOC4zYy45LjgsMS45LjQsMi4xLS44bC41LTUuOWMuMS0xLjMtLjctMi44LTEuOC0zLjVsLTEwLjQtNi40aDBaTTExNjcuMywxMDljLS4zLTEuMi0xLjYtMi0yLjgtMS44bC04LjksMS41Yy0xLjIuMi0yLDEuNC0xLjcsMi42bC43LDIuNmMuMywxLjIsMS41LDIuMywyLjgsMi40bDkuNS42YzEuMiwwLDIuMS0uOSwxLjgtMi4xbC0xLjMtNS44aDBzMCwwLDAsMFpNMTE2NS4xLDE2MS42Yy40LTEuMi4xLTIuOS0uNy0zLjhsLTkuMy0xMWMtLjgtLjktMS44LS44LTIuMi40bC0xLjIsMy4zYy0uNSwxLjItLjIsMi45LjUsNGw4LjgsMTIuMmMuNywxLDEuNy45LDIuMi0uM2wxLjktNC44aDBaTTExMTYuNiwyMTIuNGMxLjEtLjUsMi4xLTEuOSwyLjItMy4xbDEtMjIuN2MwLTEuMi0uOS0xLjktMi0xLjRsLTMuMiwxLjJjLTEuMi40LTIuMiwxLjgtMi4zLDMuMWwtMi40LDIzLjNjLS4xLDEuMy43LDEuOSwxLjksMS41bDQuOC0xLjloMFpNMTA4MC4xLDE4OC43Yy0xLjItLjMtMi43LjQtMy40LDEuNGwtMTQuNCwyNC4yYy0uNiwxLjEtLjIsMi4yLDEuMSwyLjRsNC43LjljMS4yLjIsMi43LS41LDMuMy0xLjZsMTMtMjQuNWMuNi0xLjEsMC0yLjItMS4yLTIuNGwtMy4xLS42aDBaTTExNTMuOSwxODIuOGMuNy0xLC44LTIuNy4zLTMuOWwtNy42LTE0LjZjLS42LTEuMS0xLjYtMS4yLTIuNC0uMmwtMS44LDIuM2MtLjgsMS0xLDIuNy0uNSwzLjlsNi45LDE1LjhjLjUsMS4xLDEuNiwxLjMsMi4zLjNsMi44LTMuNmgwWk0xMTM0LjQsMTc3LjZjLS4zLTEuMi0xLjMtMS42LTIuMy0uOGwtMi42LDEuOWMtMSwuNy0xLjcsMi4zLTEuNSwzLjVsMy40LDE5LjhjLjIsMS4yLDEuMiwxLjYsMi4yLjlsMy44LTIuOWMxLS44LDEuNi0yLjQsMS4zLTMuNmwtNC4zLTE4LjlaTTEwNTIuMiwxNzcuNWMxLS44LDEtMi4xLDAtMi45bC0yLjQtMi4zYy0uOS0uOS0yLjUtMS0zLjUtLjJsLTI1LjUsMTcuNmMtMSwuNy0xLjIsMi0uMywyLjlsMy44LDMuNmMuOS45LDIuNS45LDMuNS4ybDI0LjMtMTguOWgwWk0xMDA5LjEsMTc3LjhjLjYsMS4xLDIsMS41LDMuMS45bDI3LjctMTQuNWMxLjEtLjYsMS41LTEuOS44LTNsLTEuNy0yLjhjLS42LTEuMS0yLTEuNi0zLjItMWwtMjguMywxMy4yYy0xLjEuNS0xLjYsMS45LTEsM2wyLjYsNC4zWk0xMDY3LjEsMTg2LjdjLjgtLjkuNS0yLjItLjYtMi43bC0yLjgtMS40Yy0xLjEtLjYtMi43LS4zLTMuNS42bC0yMC4zLDIxLjljLS45LjktLjcsMi4yLjQsMi44bDQuMiwyLjFjMS4xLjYsMi43LjMsMy41LS43bDE5LTIyLjZaTTEwNTIuNiwxNDIuNmwxLjUsMy43Yy40LDEsMS42LDEuNCwyLjUsMWwyMS05LjRjMS0uNCwxLjQtMS42LDEtMi42bC0xLTIuNGMtLjMtMS0xLjQtMS41LTIuNC0xLjFsLTIxLjUsOC4zYy0xLC40LTEuNSwxLjUtMS4xLDIuNWgwWk0xMTg2LjgsODQuMmMtLjctMS42LTIuNi0yLjMtNC4yLTEuNGwtMTAsNS41Yy0xLjYuOS0yLjMsMi45LTEuNSw0LjZsMS44LDQuOGMuNywxLjcsMi43LDIuNiw0LjQsMi4xbDEwLjktMy4yYzEuOC0uNSwyLjYtMi4zLDItNGwtMy40LTguNGgwWk05ODUuMywxNzguN2MxLjYtLjcsMi40LTIuNywxLjctNC4zbC0xLjctNGMtLjYtMS43LTIuNi0yLjUtNC4yLTEuOWwtNTYuNSwyMS43Yy0xLjcuNi0yLjUsMi41LTEuOCw0LjJsMi45LDcuMWMuNywxLjYsMi43LDIuNCw0LjMsMS43bDU1LjQtMjQuNWgwWk0xMTQyLjksMTExLjhjMS0uMywxLjUtMS41LDEuMi0yLjVsLTEuOC00LjJjLS40LTEtMS41LTEuNC0yLjUtLjlsLTMuNSwxLjhjLS45LjUtMS40LDEuNy0xLDIuN2wxLjQsMy4yYy40LDEsMS41LDEuNSwyLjUsMS4ybDMuNi0xLjNaIi8+CiAgPHBhdGggY2xhc3M9InN0MCIgZD0iTTE0NC42LDE0OC40Yy03LjMsMzAuNC0yOC40LDQ2LjYtNTMuNyw0Ni42cy01Ni41LTI1LjItNTYuNS03MS41LDI1LTcxLjIsNTYuNS03MS4yLDQ2LjUsMTYuMiw1My44LDQ2LjZoMzQuOWMtOC41LTQ0LjktNDAuOS03NC04OC43LTc0QzM0LjksMjUuMSwwLDY1LDAsMTIzLjZzMzQuOSw5OC44LDkwLjksOTguOCw4MC0yOS4xLDg4LjYtNzRoLTM0LjlaIi8+CiAgPHBhdGggY2xhc3M9InN0MCIgZD0iTTUxNi4xLDExNi4xYy0zLjQtMTIuOS0xNS4yLTE3LjktMzEtMTcuOXMtMjYuMyw2LTI2LjMsMTUuNSw2LjgsMTQuNSwxOC45LDE2LjhsMjAsMy45YzI4LjcsNS41LDUwLjUsMTQuNCw1MC41LDQyLjFzLTI3LjksNDUuNy01OS45LDQ1LjctNTcuOC0xOS43LTYxLjItNDYuNWgzMC41YzIuOSwxNC40LDEzLjQsMjIuOSwzMS44LDIyLjlzMjguNC02LjgsMjguNC0xOC40LTEwLjUtMTYuOC0yNC40LTE5LjVsLTIxLjMtNC4yYy0yMy45LTQuNy00Mi42LTE1LjUtNDIuNi00MS4zczI2LjgtNDEsNTcuNi00MSw1Mi44LDEzLjQsNTguNiw0MS44aC0yOS40LDBaIi8+CiAgPHBhdGggY2xhc3M9InN0MCIgZD0iTTY5NS40LDE0OC41YzAsNTEtMzUuMiw3My45LTY5LjcsNzMuOXMtNjkuNy0yMi45LTY5LjctNzMuOSwzNS4yLTc0LjEsNjkuNy03NC4xLDY5LjcsMjMuMSw2OS43LDc0LjFaTTYyNS44LDE5Ny43YzIwLjEsMCwzOC0xNiwzOC00OS4ycy0xNy45LTQ5LjUtMzgtNDkuNS0zOCwxNi4zLTM4LDQ5LjUsMTcuOSw0OS4yLDM4LDQ5LjJaIi8+CiAgPHBhdGggY2xhc3M9InN0MCIgZD0iTTczNi4xLDE1Ny4yYzIuMSwyNi4zLDIwLjUsMzkuMiwzOC40LDM5LjJzMjkuMi02LjYsMzQuNy0xOS43aDMwLjhjLTYuNiwyMi42LTI3LjYsNDUuNy02NC4xLDQ1LjdzLTcxLjUtMzQuNy03MS41LTc1LjIsMjkuMi03Mi44LDY5LjQtNzIuOCw3MC40LDM1LjIsNjcuOCw4Mi44aC0xMDUuNFpNNzM2LjEsMTM0LjNoNzMuNmMtLjgtMjIuMS0xNy42LTM1LjUtMzYtMzUuNXMtMzUsOC43LTM3LjYsMzUuNVoiLz4KICA8cGF0aCBjbGFzcz0ic3QwIiBkPSJNMjc4LjEsMTA4LjZzLTEzLjcsMC0xOC40LDBjLTE5LjcsMC0zMSw3LjktMzEsMzYuM3Y3NC4xaC0zMS4zVjc3LjVoMzAuOHYyNS4yYzcuNi0xNS44LDIxLjMtMjUuMiwzOC40LTI1LjJoMTEuNXYzMS4xaDBaIi8+CiAgPHBhdGggY2xhc3M9InN0MCIgZD0iTTM1Mi42LDIyMi4zYy0xMywwLTI0LTIuMi0zMy02LjctOS00LjUtMTUuOC0xMS4xLTIwLjQtMjAtNC43LTguOS03LTE5LjctNy0zMi42di04NS41aDMwLjh2ODMuNmMwLDExLjYsMi40LDIwLjYsNy4zLDI3LDQuOSw2LjQsMTIuMyw5LjcsMjIuNCw5LjdzMTcuNi0zLjIsMjIuNS05LjdjNC45LTYuNCw3LjQtMTUuNCw3LjQtMjd2LTgzLjZoMzAuOHY4NS4yYzAsMTkuNC01LjIsMzQuMi0xNS41LDQ0LjMtMTAuNCwxMC4yLTI1LjQsMTUuMi00NS4yLDE1LjJoMFoiLz4KPC9zdmc+" alt="Crusoe"><span class="prod">AI Lifecycle</span></div>
+    <nav class="tabs" id="tabs" aria-label="Pages"></nav>
+    <button class="tourbtn" id="tourBtn" aria-pressed="false">Tour</button>
+  </div>
+</header>
+<div class="ctx gut">
+  <div class="inner">
+    <div class="ctl"><span class="eyebrow">Industry</span><div class="seg" id="segScen"></div></div>
+    <div class="ctl"><span class="eyebrow">Customer</span><div class="seg" id="segPersona"></div></div>
+    <div class="ctl"><span class="eyebrow">Talk track</span><div class="seg" id="segEvent"></div></div>
+  </div>
+</div>
+<main class="gut"><div class="inner" id="root"></div></main>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const wait = ms => new Promise(r => setTimeout(r, RM ? Math.min(ms, 60) : ms));
+
+/* ============ content ============ */
+const SCEN = {
+  phys:{label:'Physical AI', name:'Warehouse manipulation planner', slug:'pick-planner',
+    customer:'A robotics company whose arms pick mixed parts in fulfilment centres.',
+    goal:'The perception stack describes the bin as a scene graph. The model turns that and an instruction into a safe action plan the robot controller can execute.',
+    base:'Qwen/Qwen3-8B',
+    data:{rows:'38,400', sources:'teleoperation logs, simulator episodes and failure reports', split:'36,000 train · 2,400 validation · 6,000 RL prompts',
+      tiles:[['38.4k','teleop episodes'],['6,000','RL scenes for the simulator'],['17','robot skill primitives']],
+      sample:`{"messages": [
+  {"role": "system", "content": "Plan with skills: move_to, grasp, lift, place, nudge..."},
+  {"role": "user", "content": "Scene: bin A3 {motor_box x2 (sealed), bracket_01 (loose)}.
+     Move the loose bracket to tote T7. Do not touch the boxes."},
+  {"role": "assistant", "content": "[{\\"skill\\":\\"move_to\\",\\"target\\":\\"A3.above\\"},
+     {\\"skill\\":\\"grasp\\",\\"object\\":\\"bracket_01\\",\\"grip\\":\\"pinch\\"},
+     {\\"skill\\":\\"lift\\",\\"height_cm\\":12}, ... ]"}
+]}`},
+    ft:{steps:2400, train:[1.92,0.41], valid:[1.95,0.49]},
+    rl:{what:'Each candidate plan is executed in a physics simulator. Plans that finish the task without collisions score higher, so the policy learns from outcomes rather than imitation alone.',
+      rewards:[['sim_task_success',0.50,'Plan completes the task in the physics simulator'],['collision_free',0.20,'No contact with non-target objects'],['schema_valid',0.15,'Plan parses against the skill schema'],['step_efficiency',0.15,'Steps used versus the optimal plan']],
+      r:[0.38,0.86],
+      prompt:'Scene: bin C1 {motor_box x2 (stacked), hinge_04 (loose, against wall)}. Move the hinge to tote T2.',
+      out:`[{"skill":"move_to","target":"C1.above"},
+ {"skill":"nudge","object":"hinge_04","dir":"away_from_wall","cm":3},
+ {"skill":"grasp","object":"hinge_04","grip":"pinch"},
+ {"skill":"lift","height_cm":14},
+ {"skill":"move_to","target":"T2.above"},
+ {"skill":"place","object":"hinge_04"}]`,
+      checks:[['sim_task_success','Hinge placed in T2 in 3 of 3 seeded sim runs',1],['collision_free','0 contacts with motor boxes',1],['schema_valid','All 6 steps parse',1],['step_efficiency','6 steps vs. 5 optimal',0.83]]},
+    ev:{metric:'Sim task success', unit:'%', vals:[41,63,84], guards:['Collision rate ≤ 2%','Schema validity 100%','p95 latency within budget']},
+    serve:{prompt:'Scene: bin B6 {lid_cracked (on top), carton x3 (sealed)}. Remove the cracked lid to reject chute R1.',
+      resp:'[{"skill":"move_to","target":"B6.above"},{"skill":"grasp","object":"lid_cracked","grip":"wide"},{"skill":"lift","height_cm":20},{"skill":"move_to","target":"R1.above"},{"skill":"place","object":"lid_cracked"}]',
+      fb:'Plans the on-robot safety monitor aborts are logged with the scene and become new simulator tasks for the next RL run.'}},
+  fsi:{label:'Financial services', name:'AML alert triage agent', slug:'aml-triage',
+    customer:'A retail bank whose compliance team reviews thousands of transaction-monitoring alerts a week.',
+    goal:'Read an alert and the account history, decide whether to close or escalate, and draft a narrative that cites the exact transactions and policy rules.',
+    base:'Qwen/Qwen3.8-27B',
+    data:{rows:'210,000', sources:'closed alerts with analyst decisions, the policy manual and transaction ledgers', split:'200,000 train · 4,000 validation · 6,000 RL prompts',
+      tiles:[['210k','analyst-labelled alerts'],['46','policy rules'],['3.1 yrs','of decisions']],
+      sample:`{"messages": [
+  {"role": "system", "content": "You are an AML analyst. Cite TXN IDs and rule numbers."},
+  {"role": "user", "content": "ALRT-20931 (Rule S-2): 14 cash deposits of $9,400-$9,900
+     across 3 branches in 6 days. Account opened 41 days ago. TXN-88412 ..."},
+  {"role": "assistant", "content": "Disposition: ESCALATE. Deposits consistently below
+     the $10,000 CTR threshold (Rule S-2): TXN-88412, TXN-88419, ..."}
+]}`},
+    ft:{steps:3100, train:[1.64,0.52], valid:[1.66,0.58]},
+    rl:{what:'Each draft disposition is checked against the analyst label, every cited transaction is looked up in the case file, and the policy checklist is scored. Invented evidence is penalised.',
+      rewards:[['disposition_match',0.45,'Close or escalate matches the analyst decision'],['citations_exist',0.25,'Every cited TXN ID exists in the case file'],['policy_checklist',0.20,'Required rules are addressed'],['narrative_format',0.10,'Narrative follows the SAR template']],
+      r:[0.47,0.88],
+      prompt:'ALRT-21407: 9 incoming wires from 7 unrelated senders, funds moved out within 48 hours to one overseas beneficiary. 3-year-old personal checking account.',
+      out:`Disposition: ESCALATE for SAR review.
+Pattern consistent with a pass-through account (Rule L-3): inflows from
+7 unrelated senders (TXN-90211…TXN-90244) moved out within 48 hours
+to a single beneficiary (TXN-90251). No business purpose on file (Rule K-1).`,
+      checks:[['disposition_match','ESCALATE matches analyst label',1],['citations_exist','10 of 10 cited TXN IDs found',1],['policy_checklist','L-3, K-1 addressed; P-7 missing',0.67],['narrative_format','Follows SAR template',1]]},
+    ev:{metric:'Disposition accuracy', unit:'%', vals:[68,81,92], guards:['Missed escalations ≤ 1%','0 invented TXN IDs','Model risk sign-off']},
+    serve:{prompt:'ALRT-21522: 22 card-present purchases at one electronics store in 3 days, total $18,700. Customer has 9 years of history, average monthly spend $1,100.',
+      resp:'Disposition: ESCALATE for fraud review. Spend is 17x the 12-month monthly average (Rule F-2), concentrated at a single merchant (TXN-91877…TXN-91912). Recommend a card hold and customer contact before a SAR decision (Rule P-7).',
+      fb:'Every analyst override of the model\'s disposition is stored with the alert and becomes a labelled example for the next RL run.'}},
+  health:{label:'Healthcare', name:'Clinical coding assistant', slug:'icd-coder',
+    customer:'A health system\'s revenue-cycle team coding inpatient discharge summaries.',
+    goal:'Read a de-identified discharge summary and return ICD-10-CM codes, each backed by a quoted span from the note.',
+    base:'Qwen/Qwen3-8B',
+    data:{rows:'94,000', sources:'de-identified discharge summaries with coder-assigned codes and the ICD-10-CM FY2026 code set', split:'88,000 train · 2,000 validation · 4,000 RL prompts',
+      tiles:[['94k','coded encounters'],['74k+','valid ICD-10-CM codes'],['0','PHI fields retained']],
+      sample:`{"messages": [
+  {"role": "system", "content": "Return ICD-10-CM codes, each with a quoted evidence span."},
+  {"role": "user", "content": "72M admitted with acute on chronic systolic heart failure.
+     Hx hypertension, type 2 diabetes with diabetic CKD stage 3a..."},
+  {"role": "assistant", "content": "I13.0  \\"hypertension ... heart failure ... CKD\\"
+     I50.23 \\"acute on chronic systolic heart failure\\"
+     E11.22 \\"type 2 diabetes with diabetic CKD\\"
+     N18.31 \\"CKD stage 3a\\""}
+]}`},
+    ft:{steps:1800, train:[1.78,0.47], valid:[1.80,0.55]},
+    rl:{what:'Predicted codes are scored against the coder\'s set, checked for validity in the code set, and each must point to a span that really appears in the note.',
+      rewards:[['code_set_f1',0.50,'F1 against the certified coder\'s codes'],['codes_valid',0.20,'Every code exists in ICD-10-CM FY2026'],['evidence_grounded',0.20,'Each code quotes a span found in the note'],['no_phi_echo',0.10,'No identifiers repeated in the output']],
+      r:[0.44,0.85],
+      prompt:'64F with community-acquired pneumonia, right lower lobe. Course complicated by sepsis without shock. History of COPD.',
+      out:`J18.9   "community-acquired pneumonia, right lower lobe"
+A41.9   "sepsis without shock"
+J44.9   "History of COPD"`,
+      checks:[['code_set_f1','3 of 3 match; coder also added R65.20 → F1 0.86',0.86],['codes_valid','3 of 3 codes valid',1],['evidence_grounded','3 of 3 spans found in note',1],['no_phi_echo','No identifiers in output',1]]},
+    ev:{metric:'Code-set micro-F1', unit:'', vals:[0.52,0.71,0.83], guards:['0 invalid codes','Evidence on every code','Documentation team review']},
+    serve:{prompt:'58M with NSTEMI. Underwent PCI with drug-eluting stent to the LAD. History of hyperlipidemia and tobacco use.',
+      resp:'I21.4   "NSTEMI"\nE78.5   "hyperlipidemia"\nZ72.0   "tobacco use"\n(Procedure codes for the PCI are routed to the PCS coder.)',
+      fb:'Codes that human coders change at final review are captured with the note and feed the next RL run as new reward examples.'}},
+  bio:{label:'Biotech', name:'Kinase inhibitor generator', slug:'egfr-gen',
+    customer:'A drug-discovery startup searching for new EGFR inhibitor scaffolds.',
+    goal:'Propose novel small molecules as SMILES strings that dock well against the target and stay drug-like and synthesizable.',
+    base:'Qwen/Qwen3-8B',
+    data:{rows:'1.2M', sources:'public bioactivity records, in-house assay results and reaction templates', split:'1.18M train · 20,000 validation · 8,000 RL prompts',
+      tiles:[['1.2M','molecules'],['31k','EGFR assay points'],['PDB 1M17','docking target']],
+      sample:`{"messages": [
+  {"role": "system", "content": "Propose drug-like molecules as SMILES."},
+  {"role": "user", "content": "EGFR inhibitor with a quinazoline core and a solubilising group."},
+  {"role": "assistant", "content": "COCCOc1cc2ncnc(Nc3cccc(c3)C#C)c2cc1OCCOC"}
+]}`},
+    ft:{steps:5200, train:[2.31,0.63], valid:[2.33,0.71]},
+    rl:{what:'Each generated molecule is parsed with RDKit, docked against the target, and scored for drug-likeness, synthesizability and novelty. The model learns to explore new chemistry that still scores well.',
+      rewards:[['docking_score',0.40,'Predicted binding to EGFR (PDB 1M17)'],['qed',0.20,'Drug-likeness'],['valid_smiles',0.15,'RDKit parses the molecule'],['synth_access',0.15,'Synthetic accessibility score ≤ 3.5'],['novelty',0.10,'Tanimoto distance from the training set']],
+      r:[0.31,0.79],
+      prompt:'Generate an EGFR inhibitor with a non-quinazoline hinge binder, QED above 0.5.',
+      out:`Cc1cc(Nc2ncc(F)c(Nc3ccc4[nH]ncc4c3)n2)ccc1N1CCN(C)CC1`,
+      checks:[['valid_smiles','RDKit parse OK',1],['docking_score','−9.6 kcal/mol',0.88],['qed','0.58',1],['synth_access','SA 2.9',1],['novelty','Tanimoto 0.41 to nearest neighbour',0.6]]},
+    ev:{metric:'Candidates passing all filters', unit:'%', vals:[9,22,47], guards:['Validity ≥ 99%','Diversity above baseline','Chemist review of top 50']},
+    serve:{prompt:'Propose 3 EGFR inhibitors with an aminopyrimidine core and a solubilising group.',
+      resp:'1. Cc1cc(Nc2ncc(Cl)c(Nc3ccc(OC)cc3)n2)ccc1N1CCOCC1\n2. CN1CCN(c2ccc(Nc3ncc(F)c(Nc4cccc(c4)C#N)n3)cc2)CC1\n3. COc1cc(Nc2ncc(F)c(Nc3ccc4[nH]ccc4c3)n2)ccc1N1CCN(C)CC1',
+      fb:'Molecules sent to the wet lab come back with assay results, which replace the docking proxy as reward in the next RL run.'}}
+};
+
+const PERSONA = {
+  startup:{label:'AI startup',
+    data:'No platform team needed. Storage and compute are ready the day the account opens.',
+    finetune:'Serverless Fine-Tuning means no cluster at all: upload JSONL, start a job, get a checkpoint.',
+    rl:'RL is the hardest stack to build. Managed RL lets a three-person team ship a post-trained model without hiring RL infrastructure engineers.',
+    mlflow:'No MLflow server to host or patch, and a clear record of progress to show investors and design partners.',
+    serve:'Self-Serve Endpoints put the model behind an API in minutes, so the product team can ship the same week.',
+    platform:'Start on serverless services, then move to dedicated clusters on the same cloud as the company grows.'},
+  native:{label:'AI native',
+    data:'Large multimodal datasets sit next to the GPUs, so data loading does not starve training.',
+    finetune:'Bring your own training stack to Managed Slurm or Crusoe Managed Kubernetes when you need full control, with AutoClusters replacing failed nodes.',
+    rl:'Rollout throughput is the RL bottleneck. Managed RL runs sampling and training as separate managed pools and keeps them both busy.',
+    mlflow:'One tracking server for every team and thousands of runs, with the standard MLflow APIs your code already uses.',
+    serve:'Cost per token decides gross margin. Managed Inference, powered by MemoryAlloy™ technology, raises throughput on the same hardware.',
+    platform:'Shift the same GPUs between training, RL and serving as the roadmap changes, with one view in Command Center.'},
+  ent:{label:'Enterprise AI',
+    data:'Data stays inside the customer\'s Crusoe Cloud project, with every dataset version logged for audit.',
+    finetune:'Fine-tune open-weight models on private data without sending it to a third-party model API.',
+    rl:'Reward functions encode the company\'s own policies, so the model is trained to follow them and every reward is traceable.',
+    mlflow:'Lineage from dataset to deployed endpoint, which is what model risk management and audit teams ask for.',
+    serve:'A dedicated endpoint for the company\'s own model, with every request traced into MLflow.',
+    platform:'Enterprise GPU capacity with usage, health and spend visible in Command Center.'}
+};
+
+const EVENT = {
+  general:{label:'General', ros:'Five-minute booth demo',
+    flow:'Start on this page. Press Play the flow and narrate each step as it lights up. End on the results bars.',
+    data:'Start with the customer problem, not the GPUs. Say what the model must do and how we will know it works.',
+    finetune:'Fine-tuning gets the model to the right format. It does not make it reliable yet.',
+    rl:'This is the step most teams cannot build alone. The customer writes the loop and the reward; Crusoe runs the GPUs.',
+    mlflow:'Every step wrote to the same MLflow workspace. Point at the lineage chain, then at the jump from SFT to RL.',
+    serve:'Send a live request. Then point at the feedback loop: production keeps improving the model.',
+    platform:'Watch the GPU grid change colour step by step. Same fleet, different jobs.'},
+  sglang:{label:'SGLang Summit', ros:'SGLang Summit demo (technical, 8 minutes)',
+    flow:'Frame it: in RL, inference sits inside the training loop, so serving speed becomes training speed.',
+    data:'For RL you need prompts and a checker, not reference answers. Show the RL prompt split.',
+    finetune:'Keep this short. SFT produces the policy RL will sample from.',
+    rl:'GRPO samples a group of completions per prompt that share the prompt prefix, which is exactly what prefix caching is built for. Walk the loop: sample, score, forward_backward, optim_step, new weights to the sampler.',
+    mlflow:'Log reward, rollout tokens and step time together, so you can see when sampling becomes the bottleneck.',
+    serve:'Cite the MemoryAlloy™ technology numbers: 9.9x faster TTFT and 5x throughput vs. vLLM on GPT-OSS-120B.',
+    platform:'Show the split between sampling GPUs and trainer GPUs. Rebalancing that ratio is the main tuning lever.'},
+  kubecon:{label:'KubeCon', ros:'KubeCon demo (platform-focused, 6 minutes)',
+    flow:'Frame it: the whole lifecycle is a set of managed services plus Kubernetes workloads the platform team already knows how to run.',
+    data:'Data prep jobs run as ordinary batch workloads next to the GPUs.',
+    finetune:'Show the second path: a gang-scheduled multi-node job on Crusoe Managed Kubernetes, with AutoClusters replacing unhealthy nodes.',
+    rl:'Managed RL removes the hardest workloads to operate: the sampler fleet and trainer pool, and the weight sync between them.',
+    mlflow:'MLflow is a managed service next to the cluster, not another stateful app for the platform team to run.',
+    serve:'Promotion is declarative: the registry alias moves and the endpoint follows. GitOps-friendly.',
+    platform:'One GPU fleet, many tenants: training, RL and serving share capacity with quotas and priorities.'}
+};
+
+const STEPS = [
+  {id:'data', n:1, t:'Prepare data', svc:'Crusoe Cloud', svcLong:'Crusoe Cloud compute and storage', art:'dataset v4', ml:['dataset','v4 logged'], gpu:[0,0,0,0], gcap:'CPU instances'},
+  {id:'finetune', n:2, t:'Fine-tune', svc:'Serverless Fine-Tuning', svcLong:'Serverless Fine-Tuning · Managed Slurm · Crusoe Managed Kubernetes', art:'SFT adapter', ml:['run','sft · loss'], gpu:[8,0,0,0], gcap:'8 GPUs training'},
+  {id:'rl', n:3, t:'Post-train with RL', svc:'Crusoe Managed RL', svcLong:'Crusoe Managed RL', art:'RL adapter', ml:['run','grpo · reward'], gpu:[0,5,3,0], gcap:'5 sampling · 3 training'},
+  {id:'mlflow', n:4, t:'Evaluate & register', svc:'Crusoe Managed MLflow', svcLong:'Crusoe Managed MLflow', art:'v7 @champion', ml:['model','v7 @champion'], gpu:[0,0,0,2], gcap:'2 GPUs on eval'},
+  {id:'serve', n:5, t:'Serve', svc:'Crusoe Managed Inference', svcLong:'Crusoe Managed Inference', art:'traces', ml:['traces','every request'], gpu:[0,2,1,4], gcap:'4 serving · 3 next RL run'}
+];
+const PAGES = [{id:'flow', n:0, t:'Flow'}, ...STEPS.map(s=>({id:s.id, n:s.n, t:{data:'Data',finetune:'Fine-tune',rl:'Managed RL',mlflow:'MLflow',serve:'Serve'}[s.id]})), {id:'platform', n:6, t:'Platform'}, {id:'why', n:7, t:'Why Crusoe'}];
+
+const state = {scen:'phys', persona:'startup', event:'general', page:'flow', flowSel:'data', tour:false};
+try{ const s = JSON.parse(localStorage.getItem('crusoe-lifecycle')||'{}'); ['scen','persona','event'].forEach(k=>{ if(s[k] && ({scen:SCEN,persona:PERSONA,event:EVENT})[k][s[k]]) state[k]=s[k]; }); }catch(e){}
+const save = () => { try{ localStorage.setItem('crusoe-lifecycle', JSON.stringify({scen:state.scen,persona:state.persona,event:state.event})); }catch(e){} };
+const fmtV = (S,i) => S.ev.unit==='%' ? S.ev.vals[i]+'%' : S.ev.vals[i].toFixed(2);
+let runToken = 0;   // bumps on every page render; running animations check it and stop
+
+/* ============ helpers ============ */
+function rng(seed){ let s = seed>>>0 || 1; return ()=> (s = (s*1664525+1013904223)>>>0)/4294967296; }
+const seedOf = s => [...s].reduce((a,c)=>(a*31+c.charCodeAt(0))>>>0,7);
+function curve(n, a, b, shape, noise, seed){
+  const r = rng(seed), out=[];
+  for(let i=0;i<n;i++){ const x=i/(n-1);
+    const base = shape==='decay' ? b+(a-b)*Math.exp(-4.2*x) : a+(b-a)*(1-Math.exp(-3.1*x))/(1-Math.exp(-3.1));
+    out.push(base + (r()-0.5)*noise*(shape==='decay'?(0.4+(1-x)):1)); }
+  return out;
+}
+function hl(code){
+  const re = /(#[^\n]*)|("(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*')|\b(import|from|for|in|as|def|return|with|if|else|not|and|True|False|None|export)\b|\b([A-Za-z_][A-Za-z0-9_]*)(?=\()/g;
+  let out='', last=0, m;
+  while((m = re.exec(code))){ out += esc(code.slice(last, m.index));
+    out += m[1] ? `<span class="c">${esc(m[1])}</span>` : m[2] ? `<span class="s">${esc(m[2])}</span>` : m[3] ? `<span class="k">${m[3]}</span>` : `<span class="f">${esc(m[4])}</span>`;
+    last = re.lastIndex; }
+  return out + esc(code.slice(last));
+}
+function codeBlock(file, code, note){
+  const id = 'c'+Math.random().toString(36).slice(2,8);
+  return `<div class="code"><div class="cbar"><span class="fn">${esc(file)}</span><button class="cp" data-copy="${id}">Copy</button></div><pre id="${id}">${hl(code)}</pre>${note?`<p class="codenote">${esc(note)}</p>`:''}</div>`;
+}
+document.addEventListener('click', async e=>{
+  const b = e.target.closest('[data-copy]'); if(!b) return;
+  const pre = document.getElementById(b.dataset.copy);
+  try{ await navigator.clipboard.writeText(pre.textContent); b.textContent='Copied'; }
+  catch(err){ const r=document.createRange(); r.selectNodeContents(pre); const s=getSelection(); s.removeAllRanges(); s.addRange(r); b.textContent='Selected'; }
+  setTimeout(()=>{ b.textContent='Copy'; },1500);
+});
+
+/* line chart: series = [{data, color, label}] */
+function lineChart(box, series, {xLabel, xMax, fmt, lo, hi, upto, animate=true}){
+  const W=600,H=230,L=46,R=70,T=12,B=32, n=series[0].data.length, last = upto ?? n-1;
+  const x = i => L + (W-L-R)*i/(n-1), y = v => T + (H-T-B)*(1-(v-lo)/(hi-lo));
+  let g='';
+  for(let k=0;k<=4;k++){ const v=lo+(hi-lo)*k/4; g+=`<line class="grid" x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L-6}" y="${y(v)+3.5}" text-anchor="end">${fmt(v)}</text>`; }
+  [0,.25,.5,.75,1].forEach(f=>{ g+=`<text x="${L+(W-L-R)*f}" y="${H-14}" text-anchor="middle">${Math.round(xMax*f).toLocaleString()}</text>`; });
+  g+=`<text x="${W-R}" y="${H}" text-anchor="end">${esc(xLabel)}</text>`;
+  const lines = series.map((s,si)=>{ const pts = s.data.slice(0,last+1).map((v,i)=>`${x(i).toFixed(1)},${y(v).toFixed(1)}`);
+    const area = si===0 && series.length===1 && pts.length>1 ? `<path d="M${pts[0]} L${pts.join(' L')} L${x(last)},${y(lo)} L${x(0)},${y(lo)}Z" fill="${s.color}" opacity=".12"/>` : '';
+    const lab = series.length>1 ? `<text x="${x(last)+9}" y="${y(s.data[last])+4}" style="fill:var(--muted)">${esc(s.label)}</text>` : '';
+    return `${area}<polyline class="ln" points="${pts.join(' ')}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle cx="${x(last)}" cy="${y(s.data[last])}" r="4.5" fill="${s.color}" stroke="var(--panel)" stroke-width="2"/>${lab}`; }).join('');
+  box.innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(series.map(s=>s.label).join(', '))} by ${esc(xLabel)}">${g}${lines}
+    <line class="xh" y1="${T}" y2="${H-B}" stroke="var(--muted)" stroke-dasharray="3 3" opacity="0"/>
+    <rect class="hit" x="${L}" y="${T}" width="${W-L-R}" height="${H-T-B}" fill="transparent"/></svg><div class="tip" hidden></div>`;
+  const svg = box.querySelector('svg'), tip = box.querySelector('.tip'), xh = svg.querySelector('.xh');
+  if(animate && !RM) svg.querySelectorAll('.ln').forEach(ln=>{ const len=ln.getTotalLength(); ln.style.strokeDasharray=len; ln.style.strokeDashoffset=len; ln.getBoundingClientRect(); ln.style.transition='stroke-dashoffset 2s ease-out'; ln.style.strokeDashoffset=0; });
+  const hit = svg.querySelector('.hit');
+  hit.addEventListener('pointermove', e=>{ const r=svg.getBoundingClientRect(), sx=(e.clientX-r.left)*W/r.width;
+    const i=Math.max(0,Math.min(last,Math.round((sx-L)/(W-L-R)*(n-1))));
+    xh.setAttribute('x1',x(i)); xh.setAttribute('x2',x(i)); xh.setAttribute('opacity',1);
+    tip.hidden=false; tip.style.left=(x(i)*r.width/W)+'px'; tip.style.top=(y(series[0].data[i])*r.height/H)+'px';
+    tip.textContent = `step ${Math.round(xMax*i/(n-1)).toLocaleString()} · ` + series.map(s=>`${s.label} ${fmt(s.data[i])}`).join(' · '); });
+  hit.addEventListener('pointerleave', ()=>{ tip.hidden=true; xh.setAttribute('opacity',0); });
+}
+
+function head(step, title, lede, chips){
+  return `<div class="phead"><div><span class="eyebrow">${step}</span><h1>${title}</h1><p class="lede">${lede}</p>${chips?`<div class="chips">${chips}</div>`:''}</div></div>`;
+}
+function callouts(id){
+  const P=PERSONA[state.persona], E=EVENT[state.event];
+  return `<div class="callouts"><div class="callout"><span class="k">Why it matters · ${esc(P.label)}</span>${esc(P[id])}</div><div class="callout ev"><span class="k">Talk track · ${esc(E.label)}</span>${esc(E[id])}</div></div>`;
+}
+function diffs(list){
+  return `<div><span class="eyebrow">What Crusoe gives you</span></div><div class="three">${list.map(d=>`<div class="diff"><h3>${esc(d[0])}</h3><p>${esc(d[1])}</p><p class="vs"><b>Building it alone</b>${esc(d[2])}</p></div>`).join('')}</div>`;
+}
+function pnav(id){
+  const i = PAGES.findIndex(p=>p.id===id), prev = PAGES[i-1], next = PAGES[i+1];
+  return `<div class="pnav">${prev?`<a class="btn" href="#${prev.id}">← ${prev.n} ${esc(prev.t)}</a>`:'<span></span>'}${next?`<a class="btn primary" href="#${next.id}">${next.n} ${esc(next.t)} →</a>`:`<a class="btn primary" href="#flow">Back to the flow →</a>`}</div>`;
+}
+const FOOT = `<p class="foot">Training curves, rewards, evaluation scores and model outputs on these pages are simulated for demonstration and are not benchmark results. Code follows the public examples in the crusoe-developer-hub repository; the Managed RL snippet follows the Tinker API that the service is compatible with. Crusoe Managed RL and Crusoe Managed MLflow are in private preview. MemoryAlloy™ technology figures are Crusoe's published results on GPT-OSS-120B versus vLLM.</p>`;
+function scenStrip(S){
+  return `<div class="scen"><div><span class="eyebrow">${esc(S.label)} · ${esc(PERSONA[state.persona].label)}</span><h2>${esc(S.name)}</h2><p class="muted">${esc(S.customer)} ${esc(S.goal)}</p></div>
+    <dl class="facts"><dt>Base model</dt><dd>${esc(S.base)} (open weights)</dd><dt>Reward</dt><dd>${S.rl.rewards.map(r=>esc(r[0])).join(', ')}</dd><dt>Ships as</dt><dd>${esc(S.slug)} @champion on Managed Inference</dd></dl></div>`;
+}
+function resultBars(S){
+  const mx = S.ev.unit==='%'?100:1;
+  return `<div class="bars">${['Base model','After SFT','After RL'].map((l,i)=>`<div class="bar ${i===2?'best':''}"><span>${l}</span><div class="trk"><div class="fill" data-w="${S.ev.vals[i]/mx*100}"></div></div><span class="val">${fmtV(S,i)}</span></div>`).join('')}</div>`;
+}
+function growBars(root){ requestAnimationFrame(()=>requestAnimationFrame(()=>root.querySelectorAll('.fill').forEach(el=>el.style.width=el.dataset.w+'%'))); }
+const GCLS = ['--g-sft','--g-roll','--g-train','--g-inf'];
+function paintCells(cells, alloc){ let k=0; alloc.forEach((n,c)=>{ for(let j=0;j<n && k<cells.length;j++) cells[k++].style.background=`var(${GCLS[c]})`; }); while(k<cells.length) cells[k++].style.background='var(--g-idle)'; }
+const LEGEND = `<div class="legendrow"><span><i class="dot" style="background:var(--g-sft)"></i>Fine-tuning</span><span><i class="dot" style="background:var(--g-roll)"></i>RL sampling</span><span><i class="dot" style="background:var(--g-train)"></i>RL training</span><span><i class="dot" style="background:var(--g-inf)"></i>Inference and eval</span><span><i class="dot" style="background:var(--g-idle)"></i>Available</span></div>`;
+
+/* ============ page 0: the flow ============ */
+function whatFor(id, S){
+  return {
+    data:`Collect ${S.data.rows} examples from ${S.data.sources}. Format them as chat JSONL, split ${S.data.split}, and log the dataset version to MLflow.`,
+    finetune:`Supervised fine-tuning of ${S.base} with LoRA teaches the task format and vocabulary. ${S.ft.steps.toLocaleString()} steps; loss and checkpoints are tracked.`,
+    rl:S.rl.what,
+    mlflow:`Score the base, SFT and RL models on the same held-out set. ${S.ev.metric} goes from ${fmtV(S,0)} to ${fmtV(S,2)}, the gates pass, and version 7 becomes @champion.`,
+    serve:`The champion is deployed as an endpoint behind an OpenAI-compatible API. ${S.serve.fb}`
+  }[id];
+}
+function pageFlow(){
+  const S = SCEN[state.scen];
+  const cols = i => 2 + i*2;
+  const map = `
+    <div class="flow" id="flow">
+      <div class="lanebg ml"></div><div class="lanebg gp"></div>
+      <div class="lanelab" style="grid-row:2"><b>Workflow</b>you run</div>
+      <div class="lanelab" style="grid-row:3"><b>Managed MLflow</b>records</div>
+      <div class="lanelab" style="grid-row:4"><b>Crusoe Cloud</b>GPUs in use</div>
+      ${STEPS.map((s,i)=>`
+        <button class="st ${state.flowSel===s.id?'sel':''}" data-st="${s.id}" style="grid-column:${cols(i)};order:${i*10}"><span class="n">0${s.n}</span><span class="t">${s.t}</span><span class="s">${s.svc}</span><span class="pill">Ready</span></button>
+        <div class="mlc" data-ml="${s.id}" style="grid-column:${cols(i)};order:${i*10+1}"><span>${s.ml[0]}</span><b>${esc(s.ml[1])}</b></div>
+        <div class="gpc" data-gp="${s.id}" style="grid-column:${cols(i)};order:${i*10+2}"><div class="mini">${'<i></i>'.repeat(16)}</div><span>${s.gcap}</span></div>
+        ${i<STEPS.length-1?`<div class="conn" data-cn="${i}" style="grid-column:${cols(i)+1};order:${i*10+5}"><span class="tok">${esc(s.art)}</span></div>`:''}`).join('')}
+      <svg class="arc" id="arc" aria-hidden="true"></svg>
+    </div>`;
+  return `<section class="page">
+    <div class="phead"><div><span class="eyebrow">Train → Post-train → Track → Serve</span><h1>From raw data to a model in production, on one cloud</h1>
+      <p class="lede">Press play to watch one model move through every step. Each step hands an artifact to the next, writes a record to Managed MLflow, and borrows GPUs from the same Crusoe Cloud fleet.</p></div>
+      <div class="btnrow"><button class="btn primary" id="playFlow">▶ Play the flow</button></div></div>
+    ${scenStrip(S)}
+    <div class="flowwrap">${map}${LEGEND}</div>
+    <div class="card" id="narr"></div>
+    <div class="two">
+      <div class="card"><div class="cardhead"><h3>${esc(S.ev.metric)} on the held-out set</h3><span class="sim">Simulated</span></div>${resultBars(S)}
+        <p class="small muted">Fine-tuning teaches the format. RL against the customer's own checks is what moves the score.</p></div>
+      <div class="card"><h3>Five steps, four Crusoe services</h3>
+        <table class="t"><tbody>${STEPS.map(s=>`<tr><td><a href="#${s.id}">0${s.n} ${esc(s.t)}</a></td><td class="muted">${esc(s.svcLong)}</td></tr>`).join('')}</tbody></table></div>
+    </div>
+    ${callouts('flow').replace(/Why it matters · [^<]+<\/span>[^<]+/, 'Who it is for</span>'+esc(PERSONA[state.persona].label+': '+PERSONA[state.persona].platform))}
+    ${pnav('flow')}${FOOT}</section>`;
+}
+function narrate(id){
+  const S=SCEN[state.scen], s=STEPS.find(x=>x.id===id), nx=STEPS[STEPS.indexOf(s)+1];
+  $('#narr').innerHTML = `<div class="narr">
+    <div><span class="k">Step 0${s.n} · ${esc(s.t)}</span><p>${esc(whatFor(id,S))}</p></div>
+    <div><span class="k">Crusoe service</span><p><b>${esc(s.svcLong)}</b></p><p class="small muted" style="margin-top:6px">${esc(PERSONA[state.persona][id])}</p></div>
+    <div class="handoff"><span class="k">Hands off</span><span class="chip">${esc(s.art)}</span><span class="small muted">${nx?'to '+esc(nx.t):'back to step 03 as reward data'}</span><a class="btn" href="#${id}">Open step 0${s.n} →</a></div></div>`;
+  document.querySelectorAll('.st').forEach(b=>b.classList.toggle('sel', b.dataset.st===id));
+}
+function drawArc(lit){
+  const fl=$('#flow'), arc=$('#arc'); if(!fl||!arc) return;
+  if(getComputedStyle(arc).display==='none') return;
+  const fr=fl.getBoundingClientRect(), a=fl.querySelector('[data-st="rl"]').getBoundingClientRect(), b=fl.querySelector('[data-st="serve"]').getBoundingClientRect();
+  const x1=b.left-fr.left+b.width/2, x2=a.left-fr.left+a.width/2, yb=a.top-fr.top-4, yt=10;
+  arc.setAttribute('viewBox',`0 0 ${fr.width} ${fr.height}`);
+  arc.innerHTML = `<path class="l" d="M${x1} ${yb} V${yt} H${x2} V${yb-2}" fill="none" stroke-width="1.5" stroke-dasharray="5 4"/>
+    <path class="l" d="M${x2-5} ${yb-9} L${x2} ${yb-2} L${x2+5} ${yb-9}" fill="none" stroke-width="1.5"/>
+    <text x="${(x1+x2)/2}" y="${yt+16}" text-anchor="middle">production feedback → next RL run</text>`;
+  arc.classList.toggle('lit', !!lit);
+}
+function resetFlow(){
+  document.querySelectorAll('.st').forEach(b=>{ b.classList.remove('run','done'); b.querySelector('.pill').textContent='Ready'; });
+  document.querySelectorAll('.mlc').forEach(m=>m.classList.remove('on','drop'));
+  document.querySelectorAll('.conn').forEach(c=>c.classList.remove('lit'));
+  document.querySelectorAll('.gpc').forEach(g=>paintCells([...g.querySelectorAll('i')],[0,0,0,0]));
+  drawArc(false);
+}
+async function playFlow(){
+  const my = ++runToken; resetFlow();
+  const btn=$('#playFlow'); if(btn) btn.textContent='Playing…';
+  for(let i=0;i<STEPS.length;i++){
+    const s=STEPS[i], st=document.querySelector(`[data-st="${s.id}"]`); if(my!==runToken) return;
+    narrate(s.id); st.classList.add('run'); st.querySelector('.pill').textContent='Running';
+    paintCells([...document.querySelector(`[data-gp="${s.id}"]`).querySelectorAll('i')], s.gpu);
+    await wait(1600); if(my!==runToken) return;
+    const m=document.querySelector(`[data-ml="${s.id}"]`); m.classList.add('on','drop');
+    await wait(900); if(my!==runToken) return;
+    st.classList.remove('run'); st.classList.add('done'); st.querySelector('.pill').textContent='Done';
+    if(i<STEPS.length-1){ const c=document.querySelector(`[data-cn="${i}"]`), tk=c.querySelector('.tok'); c.classList.add('lit'); tk.classList.remove('go'); void tk.offsetWidth; tk.classList.add('go'); await wait(1150); }
+  }
+  if(my!==runToken) return;
+  drawArc(true); await wait(600);
+  growBars(document);
+  if(btn) btn.textContent='▶ Play again';
+  return true;
+}
+
+/* ============ page 1: data ============ */
+function pageData(){
+  const S=SCEN[state.scen], id='data';
+  const boxes=[['Sources',S.data.sources,'CPU instances'],['Clean & filter','Dedupe, drop PII, filter by quality','CPU + GPU instances'],['Format','Chat JSONL with system, user, assistant turns','messages[]'],['Split',S.data.split,'train · validation · RL'],['Upload & version','Files for fine-tuning, dataset logged to MLflow','files.create · log_input']];
+  return `<section class="page">${head('Step 01 of 05 · Crusoe Cloud','Prepare and version the data',`Every later step depends on this one. SFT needs examples of the right answer. RL needs prompts and a way to check an answer, not the answer itself.`, '<span class="chip slate">Crusoe Cloud</span><span class="chip ghost">Serverless Fine-Tuning files</span><span class="chip ghost">Managed MLflow datasets</span>')}
+    <div class="how"><div class="cardhead"><h3>How it runs</h3><span class="keys">Highlights cycle through the pipeline</span></div>
+      <div class="pipe" id="dpipe">${boxes.map((b,i)=>`${i?'<div class="parr">→</div>':''}<div class="pbox" data-i="${i}"><span class="n">${i+1}</span><span class="t">${b[0]}</span><span class="s">${esc(b[1])}</span><code>${esc(b[2])}</code></div>`).join('')}</div></div>
+    <div class="two">
+      <div class="card"><div class="cardhead"><h3>Dataset ${esc(S.slug)}-v4</h3><span class="sim">Simulated</span></div>
+        <div class="tiles">${S.data.tiles.map(t=>`<div class="tile"><div class="v">${esc(t[0])}</div><div class="l">${esc(t[1])}</div></div>`).join('')}</div>
+        <span class="eyebrow">One training record</span><div class="rec"><pre>${esc(S.data.sample)}</pre></div></div>
+      <div class="card"><h3>Two kinds of data</h3>
+        <table class="t"><thead><tr><th>For</th><th>What it contains</th><th>Example</th></tr></thead><tbody>
+          <tr><td>Fine-tuning</td><td>Prompt and the ideal answer</td><td class="muted">Past ${S.label==='Biotech'?'actives':'decisions'} written as chat turns</td></tr>
+          <tr><td>RL</td><td>Prompt only, plus a reward function that checks any answer</td><td class="muted">${esc(S.rl.rewards[0][2])}</td></tr>
+          <tr><td>Evaluation</td><td>Held-out prompts with known outcomes</td><td class="muted">${esc(S.ev.metric)}</td></tr></tbody></table>
+        <p class="small muted">The RL prompt set is where most teams underinvest. A good checker is worth more than more examples.</p></div>
+    </div>
+    ${diffs([['Data next to the GPUs','Prep jobs run on Crusoe Cloud CPU and GPU instances with shared storage in the same project, so nothing moves between providers.','Copy data between clouds and pay egress at every step.'],['Upload once, train anywhere','The same JSONL files feed Serverless Fine-Tuning, your own cluster, and the RL prompt set.','Maintain different formats for each training tool.'],['Versioned from the start','Each dataset version is logged to Managed MLflow, so every model can be traced back to the data it saw.','Track dataset versions in file names and spreadsheets.']])}
+    ${callouts(id)}
+    <div class="two">${codeBlock('prepare_and_upload.py',`import mlflow
+from openai import OpenAI
+
+# Upload for Serverless Fine-Tuning (control plane)
+client = OpenAI(api_key=CRUSOE_API_KEY,
+                base_url="https://api.intelligence.crusoecloud.com/v1")
+train = client.files.create(file=open("train.jsonl", "rb"), purpose="fine-tune")
+val   = client.files.create(file=open("validation.jsonl", "rb"), purpose="fine-tune")
+
+# Version the dataset in Crusoe Managed MLflow
+mlflow.set_experiment("${S.slug}")
+with mlflow.start_run(run_name="dataset-v4"):
+    ds = mlflow.data.from_pandas(train_df, name="${S.slug}-v4")
+    mlflow.log_input(ds, context="training")
+    mlflow.log_params({"train_file": train.id, "val_file": val.id})`, 'Endpoints and calls follow the pii-redaction example in crusoe-developer-hub.')}
+      ${codeBlock('.env',`# Crusoe Managed MLflow
+MLFLOW_TRACKING_URI=https://api.mlflow.crusoecloud.com
+MLFLOW_WORKSPACE=<your workspace name>
+MLFLOW_TRACKING_TOKEN=\${CRUSOE_API_KEY}
+
+# One key for MLflow, fine-tuning and inference
+CRUSOE_API_KEY=<your crusoe api key>`, 'From the managed-mlflow cookbook. The same key authenticates MLflow and model calls.')}</div>
+    ${pnav(id)}${FOOT}</section>`;
+}
+async function animPipe(sel, n, ms){ const my=runToken; let i=0; while(my===runToken){ document.querySelectorAll(sel+' .pbox').forEach(b=>b.classList.toggle('on', +b.dataset.i===i)); i=(i+1)%n; await wait(ms); } }
+
+/* ============ page 2: fine-tune ============ */
+function pageFinetune(){
+  const S=SCEN[state.scen], id='finetune';
+  const stages=['Validate files','Queued','Training','Checkpoints','Succeeded','Model registered'];
+  return `<section class="page">${head('Step 02 of 05 · Serverless Fine-Tuning','Fine-tune the base model',`Supervised fine-tuning with LoRA teaches ${esc(S.base)} the task's format and vocabulary. Pick the path that fits the team: no cluster at all, or your own training stack on dedicated GPUs.`, '<span class="chip">Serverless Fine-Tuning</span><span class="chip ghost">Crusoe Intelligence Foundry</span><span class="chip ghost">Managed Slurm</span><span class="chip ghost">Crusoe Managed Kubernetes</span>')}
+    <div class="two">
+      <div class="opt pick"><span class="eyebrow">Path A · no infrastructure</span><h3>Serverless Fine-Tuning</h3>
+        <ul><li>Choose a fine-tunable base model from the model list</li><li>Upload JSONL, set LoRA rank, epochs and learning rate</li><li>Watch loss and checkpoints in Crusoe Intelligence Foundry</li><li>The final checkpoint registers as a model you can deploy</li></ul></div>
+      <div class="opt"><span class="eyebrow">Path B · full control</span><h3>Your own training stack</h3>
+        <ul><li>Multi-node NVIDIA or AMD GPU clusters on Crusoe Cloud</li><li>Submit with Managed Slurm or Crusoe Managed Kubernetes</li><li>AutoClusters replaces unhealthy nodes so long runs recover</li><li>Full-parameter training, custom code, any framework</li></ul></div>
+    </div>
+    <div class="how"><div class="cardhead"><h3>Job lifecycle · ${esc(S.slug)}-sft</h3><span class="keys" id="ftstat">status: validating</span></div>
+      <div class="pipe" id="ftpipe">${stages.map((s,i)=>`${i?'<div class="parr">→</div>':''}<div class="pbox" data-i="${i}"><span class="n">${i+1}</span><span class="t">${s}</span></div>`).join('')}</div></div>
+    <div class="two">
+      <div class="card"><div class="cardhead"><h3>Training and validation loss</h3><span class="sim">Simulated</span></div><div class="chartbox" id="ftchart"></div>
+        <div class="legendrow"><span><i class="dot" style="background:var(--g-sft)"></i>train_loss</span><span><i class="dot" style="background:var(--gold)"></i>valid_loss</span></div></div>
+      <div class="card"><h3>What fine-tuning does, and does not do</h3>
+        <table class="t"><tbody>
+          <tr><td class="ok">✓</td><td>Learns the output format: ${S.label==='Biotech'?'valid SMILES':S.label==='Healthcare'?'code plus evidence span':S.label==='Physical AI'?'skill-call JSON':'disposition plus cited narrative'}</td></tr>
+          <tr><td class="ok">✓</td><td>Learns the vocabulary of the domain from ${esc(S.data.rows)} examples</td></tr>
+          <tr><td class="partial">◐</td><td>${esc(S.ev.metric)}: ${fmtV(S,0)} → ${fmtV(S,1)}. Better, but not reliable enough to ship</td></tr>
+          <tr><td class="no">✗</td><td>Does not learn from outcomes. It only imitates. That is what step 03 adds.</td></tr></tbody></table></div>
+    </div>
+    ${diffs([['No cluster to run','Serverless Fine-Tuning handles GPUs, scheduling and checkpointing. The team uploads data and gets a model back.','Provision GPUs, install drivers, write a training loop and babysit the job.'],['Same API shape as OpenAI','client.fine_tuning.jobs.create works as it does elsewhere, so existing scripts move over with a base URL change.','Learn a new SDK for each provider.'],['A clear path to scale','When a team outgrows serverless, Managed Slurm and Crusoe Managed Kubernetes run on the same cloud and data.','Re-platform onto a different provider when the job gets big.']])}
+    ${callouts(id)}
+    ${codeBlock('finetune.py',`job = client.fine_tuning.jobs.create(
+    model=BASE_MODEL_ID,                      # ${S.base}
+    training_file=train.id,
+    validation_file=val.id,
+    suffix="${S.slug}",
+    method={"type": "supervised",
+            "supervised": {"hyperparameters": {
+                "n_epochs": 2, "batch_size": 16, "learning_rate": 1e-4,
+                "lora_rank": 16, "lora_alpha": 32}}},
+)
+job = wait_for_job(job.id)                     # polls client.fine_tuning.jobs.retrieve
+checkpoints = client.fine_tuning.jobs.checkpoints.list(job.id).data
+
+with mlflow.start_run(run_name="sft-${S.slug}"):
+    for c in checkpoints:
+        mlflow.log_metric("train_loss", c.metrics.train_loss, step=c.step_number)`, 'Calls match the Serverless Fine-Tuning example (examples/training/pii-redaction).')}
+    ${pnav(id)}${FOOT}</section>`;
+}
+async function animFt(){
+  const my=runToken, S=SCEN[state.scen], seed=seedOf(state.scen+'ft');
+  const tr=curve(50,S.ft.train[0],S.ft.train[1],'decay',0.10,seed), va=curve(50,S.ft.valid[0],S.ft.valid[1],'decay',0.06,seed+3);
+  const hi=Math.ceil(S.ft.train[0]*2)/2, labels=['validating','queued','running','running','succeeded','registered'];
+  while(my===runToken){
+    for(let i=0;i<6;i++){ if(my!==runToken) return;
+      document.querySelectorAll('#ftpipe .pbox').forEach(b=>b.classList.toggle('on', +b.dataset.i===i));
+      const st=$('#ftstat'); if(st) st.textContent='status: '+labels[i];
+      if(i===2) lineChart($('#ftchart'), [{data:tr,color:'var(--g-sft)',label:'train'},{data:va,color:'var(--gold)',label:'valid'}], {xLabel:'training step', xMax:S.ft.steps, fmt:v=>v.toFixed(2), lo:0, hi});
+      await wait(i===2?2600:1100); }
+    await wait(2500);
+  }
+}
+
+/* ============ page 3: Managed RL ============ */
+function rewardCode(S){ return 'score = ' + S.rl.rewards.map(r=>`${r[1].toFixed(2)}*${r[0]}`).join(' + '); }
+function pageRL(){
+  const S=SCEN[state.scen], id='rl';
+  const total = S.rl.checks.reduce((a,c)=>a + c[2]*S.rl.rewards.find(r=>r[0]===c[0])[1],0);
+  return `<section class="page">${head('Step 03 of 05 · Crusoe Managed RL','Post-train with reinforcement learning',`${esc(S.rl.what)} You write the loop and the reward. Crusoe Managed RL runs sampling and training on Crusoe Cloud GPUs.`, '<span class="chip">Crusoe Managed RL</span><span class="chip ghost">Private preview</span><span class="chip ghost">Python SDK</span><span class="chip ghost">Tinker API compatible</span><span class="chip ghost">LoRA, base frozen</span>')}
+    <div class="how">
+      <div class="cardhead"><h3>One GRPO step, repeated 60 times</h3><div class="btnrow"><button class="btn" id="rlRestart">↺ Restart</button></div></div>
+      <div class="loopgrid">
+        <div class="side"><span class="hd">Your side</span>
+          <div class="ybox" data-ph="model"><span class="i">1</span><span class="t">Pick a model</span><span class="s">${esc(S.base)} + your SFT adapter</span></div>
+          <div class="ybox" data-ph="data"><span class="i">2</span><span class="t">Your prompts</span><span class="s">${esc(S.data.split.split('·').pop().trim())}</span></div>
+          <div class="ybox" data-ph="reward"><span class="i">3</span><span class="t">Your reward</span><span class="s"><code>${esc(rewardCode(S))}</code></span></div>
+          <div class="ybox" data-ph="loop"><span class="i">4</span><span class="t">Your training loop</span><span class="s">advantage = reward − group mean</span></div>
+        </div>
+        <div class="wire">
+          <div class="w r" data-w="sample"><span>sample()</span><span class="ln"></span><span>prompts</span></div>
+          <div class="w l" data-w="back"><span>rollouts</span><span class="ln"></span><span>tokens, logprobs</span></div>
+          <div class="w r" data-w="fb"><span>forward_backward()</span><span class="ln"></span><span>scored datums</span></div>
+        </div>
+        <div class="cloud"><div class="hd"><span class="eyebrow">Crusoe Cloud · Crusoe Managed RL</span><span class="chip ghost">per-session GPUs</span></div>
+          <div class="cbox" data-c="sampler"><span class="t">Sampler <code>sample()</code></span><span class="s">Generates rollouts from the current policy, 8 per prompt, many prompts at once</span></div>
+          <div class="vw"><span data-v="down">↓ rollouts to your reward</span><span data-v="up">↑ save_weights_and_get_sampling_client(): new weights to the sampler</span></div>
+          <div class="cbox" data-c="trainer"><span class="t">Trainer <code>forward_backward()</code> <code>optim_step()</code></span><span class="s">Updates LoRA weights on the base model, which stays frozen</span></div>
+          <div class="vw"><span data-v="ckpt">↓ every 10 steps</span></div>
+          <div class="cbox" data-c="ckpt"><span class="t">Checkpoints</span><span class="s">LoRA adapters, yours to keep or deploy</span></div>
+        </div>
+      </div>
+      <div class="stepline"><span class="dim">step</span><span class="big" id="rlStep">0</span><span class="dim">/ 60</span><span class="call" id="rlCall">ready</span></div>
+    </div>
+    <div class="two">
+      <div class="card"><div class="cardhead"><h3>Mean reward · grpo-${esc(S.slug)}</h3><span class="sim">Simulated</span></div><div class="chartbox" id="rlchart"></div></div>
+      <div class="card"><div class="cardhead"><h3>One group of 8 rollouts, same prompt</h3><span class="sim">Simulated</span></div>
+        <div class="group" id="grp">${'<i></i>'.repeat(8)}<span class="mean" id="gmean"></span></div>
+        <div class="glab" id="glab"></div>
+        <p class="small muted">GRPO compares rollouts within a group. Those above the dashed group mean (highlighted) get a positive advantage and are reinforced; those below are discouraged. No separate value model is needed.</p></div>
+    </div>
+    <div class="card"><div class="cardhead"><h3>One rollout, scored by the customer's reward functions</h3><span class="sim">Simulated</span></div>
+      <div class="two"><div class="chat"><div class="msg u"><span class="who">prompt</span>${esc(S.rl.prompt)}</div><div class="rec"><pre>${esc(S.rl.out)}</pre></div></div>
+      <div class="tablewrap"><table class="t"><thead><tr><th>Reward</th><th>Result</th><th class="num">Weight</th><th class="num">Score</th></tr></thead><tbody>
+      ${S.rl.checks.map(c=>{ const w=S.rl.rewards.find(r=>r[0]===c[0])[1]; const cl=c[2]>=0.99?'ok':c[2]>=0.5?'partial':'no', ic=c[2]>=0.99?'✓':c[2]>=0.5?'◐':'✗';
+        return `<tr><td><code>${esc(c[0])}</code></td><td><span class="${cl}">${ic}</span> ${esc(c[1])}</td><td class="num">${w.toFixed(2)}</td><td class="num">${c[2].toFixed(2)}</td></tr>`;}).join('')}
+      <tr><td colspan="3"><b>Weighted reward</b></td><td class="num hl"><b>${total.toFixed(2)}</b></td></tr></tbody></table></div></div></div>
+    ${diffs([['You keep the loop','A Python SDK compatible with the Tinker API: sample(), forward_backward(), optim_step(). Your algorithm, your reward, your data, in plain Python.','Adopt a framework that hides the loop, or build one from scratch.'],['Crusoe runs the hard part','Sampler fleet, trainer, weight sync between them, and GPU scheduling are managed on Crusoe Cloud for each session.','Stitch together an inference engine, a trainer, weight sync and a scheduler, and keep them all busy.'],['Rewards from the real world','Reward functions can call anything: a simulator, a database, a code-set validator, RDKit, a docking engine. Every component is logged to MLflow.','Only use rewards a hosted service supports, or skip RL entirely.']])}
+    ${callouts(id)}
+    <div class="two">${codeBlock('grpo_loop.py',`import tinker, mlflow
+from tinker import types
+
+service = tinker.ServiceClient()          # pointed at Crusoe Managed RL
+trainer = service.create_lora_training_client(base_model="${S.base}", rank=32)
+sampler = trainer.save_weights_and_get_sampling_client(name="step-0")
+
+for step in range(60):
+    prompts  = next(batches)                                        # your data
+    futures  = [sampler.sample(prompt=p, num_samples=8,
+                    sampling_params=types.SamplingParams(max_tokens=1024))
+                for p in prompts]                                   # Crusoe GPUs
+    groups   = [f.result().sequences for f in futures]
+    rewards  = [[reward(p, s) for s in g] for p, g in zip(prompts, groups)]   # your code
+    datums   = to_datums(prompts, groups, advantages(rewards))     # reward − group mean
+    trainer.forward_backward(datums, loss_fn="importance_sampling").result()
+    trainer.optim_step(types.AdamParams(learning_rate=4e-5)).result()
+    sampler  = trainer.save_weights_and_get_sampling_client(name=f"step-{step + 1}")
+    mlflow.log_metric("reward_mean", mean_reward(rewards), step=step)`, 'Pattern follows the Tinker API that Managed RL is compatible with. See the Wordle GRPO recipe in crusoe-developer-hub for a complete, runnable version.')}
+    ${codeBlock('reward.py',`def reward(prompt, sample) -> float:
+${S.rl.rewards.map(r=>`    ${r[0].padEnd(18)} = check_${r[0]}(prompt, sample)   # ${r[2]}`).join('\n')}
+    return (${S.rl.rewards.map(r=>`${r[1].toFixed(2)} * ${r[0]}`).join('\n          + ')})`, 'The reward is ordinary Python that runs on your side, so it can call your own systems.')}</div>
+    ${pnav(id)}${FOOT}</section>`;
+}
+async function animRL(){
+  const my=++runToken, S=SCEN[state.scen], seed=seedOf(state.scen+'rl');
+  const data=curve(61,S.rl.r[0],S.rl.r[1],'rise',0.07,seed), r=rng(seed+9);
+  const set=(sel,attr,val)=>document.querySelectorAll(sel).forEach(e=>e.classList.toggle('on', e.getAttribute(attr)===val));
+  const phase=(p)=>{ set('.ybox','data-ph',p.y||''); set('.w','data-w',p.w||''); set('.cbox','data-c',p.c||''); set('.vw span','data-v',p.v||''); const c=$('#rlCall'); if(c) c.textContent=p.call; };
+  const group=(m)=>{ const vals=Array.from({length:8},()=>Math.max(0.02,Math.min(1,m+(r()-0.5)*0.55))); const mean=vals.reduce((a,b)=>a+b,0)/8;
+    const g=$('#grp'); if(!g) return; [...g.querySelectorAll('i')].forEach((el,i)=>{ el.style.height=(vals[i]*100)+'%'; el.classList.toggle('pos', vals[i]>=mean); });
+    $('#gmean').style.bottom=(mean*100)+'%'; $('#glab').innerHTML=vals.map(v=>`<span>${(v-mean>=0?'+':'')+(v-mean).toFixed(2)}</span>`).join(''); };
+  const chart=(k)=>{ const b=$('#rlchart'); if(b) lineChart(b,[{data,color:'var(--accent)',label:'reward'}],{xLabel:'GRPO step',xMax:60,fmt:v=>v.toFixed(2),lo:0,hi:1,upto:k,animate:false}); };
+  chart(0); group(data[0]);
+  for(let step=0; step<60; step++){
+    const ms = step<2 ? 1100 : step<5 ? 380 : 70;
+    const seq=[{y:'data',w:'sample',c:'sampler',call:'sampler.sample()'},{w:'back',v:'down',c:'sampler',call:'rollouts returned'},{y:'reward',call:'reward(): your code scores each rollout'},{y:'loop',w:'fb',c:'trainer',call:'trainer.forward_backward()'},{c:'trainer',call:'trainer.optim_step()'},{v:'up',c:'sampler',call:'save_weights_and_get_sampling_client()'}];
+    for(const p of seq){ if(my!==runToken) return; phase(p); await wait(ms); }
+    if(my!==runToken) return;
+    $('#rlStep').textContent=step+1; chart(step+1); group(data[step+1]);
+    if((step+1)%10===0){ const ck=document.querySelector('[data-c="ckpt"]'); const v=document.querySelector('[data-v="ckpt"]'); ck.classList.remove('flash'); void ck.offsetWidth; ck.classList.add('flash'); v.classList.add('on'); setTimeout(()=>v.classList.remove('on'),600); }
+  }
+  phase({call:`done · reward ${data[60].toFixed(2)} · 6 checkpoints saved`});
+  return true;
+}
+
+/* ============ page 4: MLflow ============ */
+function pageMlflow(){
+  const S=SCEN[state.scen], id='mlflow';
+  const chain=[['dataset',`${S.slug}-v4`],['SFT run',`sft-${S.slug}`],['RL run',`grpo-${S.slug} #12`],['evaluation','eval-v7'],['model',`${S.slug} v7 @champion`],['endpoint',`${S.slug}-prod`]];
+  const kinds=[['Datasets','Which data each run saw','Step 01'],['Runs & metrics','Loss, reward components, hyperparameters','Steps 02–03'],['Evaluations','Python scorers and LLM judges on held-out data','Step 04'],['Models & prompts','Versions, aliases, prompt versions','Step 04'],['Traces','Every production request and response','Step 05']];
+  return `<section class="page">${head('Step 04 of 05 · Crusoe Managed MLflow','Track, evaluate and promote',`Every step writes to one Managed MLflow workspace. Here the base, SFT and RL models are scored on the same held-out set, and the winner is promoted by moving an alias.`, '<span class="chip">Crusoe Managed MLflow</span><span class="chip ghost">Private preview</span><span class="chip ghost">Standard MLflow APIs</span>')}
+    <div class="how"><div class="cardhead"><h3>Lineage of the model in production</h3><span class="keys">Every link is one click in the MLflow UI</span></div>
+      <div class="pipe" id="mlpipe">${chain.map((c,i)=>`${i?'<div class="parr">→</div>':''}<div class="pbox" data-i="${i}"><span class="n">${esc(c[0])}</span><span class="t" style="overflow-wrap:anywhere">${esc(c[1])}</span></div>`).join('')}</div></div>
+    <div class="two">
+      <div class="card"><div class="cardhead"><h3>${esc(S.ev.metric)} on the held-out set</h3><span class="sim">Simulated</span></div>${resultBars(S)}
+        <span class="eyebrow">Promotion gates</span><div class="chips">${S.ev.guards.map(g=>`<span class="chip ghost" style="color:var(--good);border-color:var(--green)">✓ ${esc(g)}</span>`).join('')}</div></div>
+      <div class="card"><h3>What lands in the workspace</h3><table class="t"><thead><tr><th>Object</th><th>Holds</th><th>Written by</th></tr></thead><tbody>
+        ${kinds.map(k=>`<tr><td>${k[0]}</td><td class="muted">${k[1]}</td><td class="dim">${k[2]}</td></tr>`).join('')}</tbody></table></div>
+    </div>
+    <div class="card"><div class="cardhead"><h3>Experiment ${esc(S.slug)} · RL runs compared</h3><span class="sim">Simulated</span></div>
+      <div class="tablewrap"><table class="t"><thead><tr><th>Run</th><th class="num">LoRA rank</th><th class="num">Learning rate</th><th class="num">Group size</th><th class="num">Final reward</th><th>${esc(S.ev.metric)}</th></tr></thead><tbody>
+      ${[[9,16,'2e-5',4,-0.07],[10,32,'4e-5',4,-0.04],[11,32,'4e-5',8,-0.02],[12,32,'4e-5',8,0],[13,64,'8e-5',8,-0.09]].map(r=>{ const fr=(S.rl.r[1]+r[4]); const ev=S.ev.unit==='%'?Math.round(S.ev.vals[2]+r[4]*100)+'%':(S.ev.vals[2]+r[4]).toFixed(2);
+        return `<tr${r[4]===0?' style="color:var(--accent)"':''}><td><code>grpo-${esc(S.slug)} #${r[0]}</code>${r[4]===0?' → v7':''}</td><td class="num">${r[1]}</td><td class="num">${r[2]}</td><td class="num">${r[3]}</td><td class="num">${fr.toFixed(2)}</td><td>${ev}</td></tr>`; }).join('')}</tbody></table></div></div>
+    ${diffs([['No server to run','A hosted tracking server, artifact store and registry in the Crusoe Console, authenticated with the same API key as everything else.','Deploy MLflow, a database and object storage, then patch and back them up.'],['Your code already works','Standard MLflow APIs for runs, tracing, GenAI evaluation and prompts. Set the tracking URI and workspace; nothing else changes.','Rewrite logging for a proprietary tracking tool.'],['Promotion with an audit trail','Registry aliases and lineage connect every deployed model to its data, runs and evaluation.','Promote by copying checkpoints and hoping someone wrote it down.']])}
+    ${callouts(id)}
+    ${codeBlock('evaluate_and_promote.py',`import mlflow
+from mlflow.genai.scorers import scorer
+
+@scorer
+def ${S.rl.rewards[0][0]}(outputs, expectations) -> float:
+    return check_${S.rl.rewards[0][0]}(outputs, expectations)     # same check as the RL reward
+
+results = mlflow.genai.evaluate(
+    data=held_out,                       # ${esc(S.data.split.split('·')[1]?.trim()||'held-out set')}
+    predict_fn=call_model,               # base, SFT and RL candidates in turn
+    scorers=[${S.rl.rewards[0][0]}],
+)
+
+mv = mlflow.register_model(f"runs:/{rl_run_id}/adapter", "${S.slug}")
+mlflow.MlflowClient().set_registered_model_alias("${S.slug}", "champion", mv.version)`, 'Evaluation with Python scorers follows the managed-mlflow cookbook (03_evaluation.py).')}
+    ${pnav(id)}${FOOT}</section>`;
+}
+
+/* ============ page 5: serve ============ */
+function pageServe(){
+  const S=SCEN[state.scen], id='serve';
+  const path=[['Your app','Product, agent or workflow','OpenAI SDK'],['API','OpenAI-compatible','api.inference.crusoecloud.com/v1'],['Endpoint',`${S.slug}-prod · v7`,'MemoryAlloy™ technology'],['Managed MLflow','Every request traced','mlflow.openai.autolog()'],['Next RL run','Flagged traces become prompts and reward data','back to step 03']];
+  return `<section class="page">${head('Step 05 of 05 · Crusoe Managed Inference','Serve the model, and keep improving it',`The champion version goes behind an OpenAI-compatible endpoint. Every request is traced back into Managed MLflow, and the hard cases feed the next RL run.`, '<span class="chip">Crusoe Managed Inference</span><span class="chip ghost">Self-Serve Endpoints</span><span class="chip ghost">MemoryAlloy™ technology</span>')}
+    <div class="how"><div class="cardhead"><h3>Request path and feedback loop</h3><span class="keys">Highlights follow one request</span></div>
+      <div class="pipe" id="svpipe">${path.map((b,i)=>`${i?'<div class="parr">→</div>':''}<div class="pbox" data-i="${i}"><span class="n">${i+1}</span><span class="t">${b[0]}</span><span class="s">${esc(b[1])}</span><code>${esc(b[2])}</code></div>`).join('')}</div></div>
+    <div class="two">
+      <div class="card"><div class="cardhead"><h3>Endpoint ${esc(S.slug)}-prod</h3><span class="sim">Simulated</span></div>
+        <div class="chat"><div class="msg u"><span class="who">request</span>${esc(S.serve.prompt)}</div><div class="msg a"><span class="who">${esc(S.slug)} v7 @champion</span><pre id="out"></pre></div></div>
+        <div class="meta"><span>OpenAI-compatible</span><span>dedicated deployment</span><span>trace → MLflow</span></div>
+        <div class="btnrow"><button class="btn primary" id="sendBtn">Send request</button></div></div>
+      <div class="col" style="display:flex;flex-direction:column;gap:14px">
+        <div class="opt"><span class="eyebrow">Shared models</span><h3>Serverless inference</h3><ul><li>Popular open models ready to call, billed per token</li><li>Used here for the base model and the LLM judge in evaluation</li></ul></div>
+        <div class="opt pick"><span class="eyebrow">Your model</span><h3>Self-Serve Endpoints</h3><ul><li>Deploy your fine-tuned or RL checkpoint as a dedicated deployment</li><li>Choose an optimization profile and replica count in Crusoe Intelligence Foundry</li><li>Call it by its alias with the same OpenAI client</li></ul></div>
+        <p class="claim">Crusoe Managed Inference, powered by MemoryAlloy™ technology: <b>9.9x faster time to first token</b> and <b>5x higher throughput</b> than vLLM on GPT-OSS-120B.</p>
+      </div>
+    </div>
+    ${diffs([['Fast on the same hardware','MemoryAlloy™ technology delivers 9.9x faster TTFT and 5x higher throughput than vLLM on GPT-OSS-120B, which lowers cost per token.','Tune an open-source server yourself and pay for the idle headroom.'],['From checkpoint to API in minutes','Pick the checkpoint, pick a profile, get an alias. The app calls it with the OpenAI SDK it already uses.','Build containers, autoscaling and rollout tooling for every model version.'],['Production closes the loop','Traces land in Managed MLflow next to the training runs, so the hard cases become the next RL run\'s prompts.','Production logs live in a different system from training, and nobody joins them.']])}
+    ${callouts(id)}
+    <div class="two">${codeBlock('call_endpoint.py',`import mlflow
+from openai import OpenAI
+
+mlflow.openai.autolog()            # each call becomes a trace in Managed MLflow
+
+client = OpenAI(api_key=CRUSOE_API_KEY,
+                base_url="https://api.inference.crusoecloud.com/v1")
+resp = client.chat.completions.create(
+    model=DEPLOYMENT_ALIAS,        # your Self-Serve Endpoint
+    messages=[{"role": "user", "content": request}],
+)
+print(resp.choices[0].message.content)`, 'Matches the deployment and tracing examples in crusoe-developer-hub.')}
+      ${codeBlock('mlflow_deployments.py',`import mlflow.deployments
+
+# pip install mlflow-crusoe
+client = mlflow.deployments.get_deploy_client("crusoe")
+client.create_deployment(name="${S.slug}", model_uri="${S.base}",
+                         config={"temperature": 0.2, "max_tokens": 1024})
+result = client.predict("${S.slug}", inputs={"messages": [
+    {"role": "user", "content": request}]})`, 'The mlflow-crusoe deployment plugin manages endpoint configurations from MLflow.')}</div>
+    ${pnav(id)}${FOOT}</section>`;
+}
+function stream(){ const S=SCEN[state.scen], o=$('#out'); if(!o) return; const my=runToken; o.textContent=''; o.classList.add('caret'); const txt=S.serve.resp; let i=0;
+  const tick=()=>{ if(my!==runToken||!document.body.contains(o)) return; i+=Math.max(2,Math.round(txt.length/90)); o.textContent=txt.slice(0,i); if(i<txt.length) setTimeout(tick,26); else o.classList.remove('caret'); }; setTimeout(tick,300); }
+
+/* ============ page 6: platform ============ */
+const FLEET = {data:[0,0,0,0], finetune:[32,0,0,0], rl:[0,24,16,0], mlflow:[0,0,0,8], serve:[0,8,8,16]};
+const FLEETCAP = {data:'Data jobs on CPU instances · 64 GPUs available', finetune:'4 nodes × 8 GPUs fine-tuning', rl:'24 GPUs sampling rollouts · 16 GPUs training', mlflow:'8 GPUs running batch evaluation', serve:'16 GPUs serving · 16 GPUs on the next RL run'};
+function pagePlatform(){
+  const id='platform', E=EVENT[state.event];
+  return `<section class="page">${head('Under every step · Crusoe Cloud','One GPU fleet for the whole lifecycle',`Training, RL, evaluation and serving all run on Crusoe Cloud. Capacity moves between them as the project advances, with no migration between providers.`, '<span class="chip slate">Crusoe Cloud</span><span class="chip ghost">Managed Slurm</span><span class="chip ghost">Crusoe Managed Kubernetes</span><span class="chip ghost">AutoClusters</span><span class="chip ghost">Command Center</span>')}
+    <div class="how"><div class="cardhead"><h3>64-GPU example, by step</h3><div class="seg" id="fleetSeg">${STEPS.map(s=>`<button data-f="${s.id}" aria-pressed="false">0${s.n} ${esc(s.t)}</button>`).join('')}</div></div>
+      <div class="fleet" id="fleet">${'<i></i>'.repeat(64)}</div>${LEGEND}<p class="keys" id="fleetCap"></p></div>
+    <div class="three">
+      <div class="diff"><h3>Managed Slurm</h3><p>Researchers submit batch jobs the way they always have, on multi-node GPU clusters.</p></div>
+      <div class="diff"><h3>Crusoe Managed Kubernetes</h3><p>Platform teams run training, data and serving workloads as Kubernetes jobs and deployments.</p></div>
+      <div class="diff"><h3>AutoClusters</h3><p>Unhealthy nodes are detected and replaced automatically, so long runs recover without a human on call.</p></div>
+      <div class="diff"><h3>Command Center</h3><p>Usage, health and spend for every workload in one place.</p></div>
+      <div class="diff"><h3>NVIDIA and AMD GPUs</h3><p>From a single GPU for experiments to large clusters for training, on Crusoe Cloud.</p></div>
+      <div class="diff"><h3>Diverse energy sources</h3><p>Crusoe builds and operates its own AI data centers, powered by diverse energy sources.</p></div>
+    </div>
+    ${callouts(id)}
+    <div class="card"><h3>Talk track for ${esc(E.label)}, step by step</h3><table class="t"><tbody>${STEPS.map(s=>`<tr><td style="white-space:nowrap"><a href="#${s.id}">0${s.n} ${esc(s.t)}</a></td><td class="muted">${esc(E[s.id])}</td></tr>`).join('')}</tbody></table></div>
+    ${codeBlock('cluster_view.sh',`# Path B training on your own cluster
+sbatch --nodes=4 --gpus-per-node=8 train_sft.sbatch        # Managed Slurm
+kubectl apply -f sft-job.yaml                               # Crusoe Managed Kubernetes
+kubectl get nodes -L nvidia.com/gpu.product                 # GPU inventory`)}
+    ${pnav(id)}${FOOT}</section>`;
+}
+async function animFleet(){ const my=runToken; let i=0;
+  const show=k=>{ paintCells([...document.querySelectorAll('#fleet i')], FLEET[k]); $('#fleetCap').textContent=FLEETCAP[k]; document.querySelectorAll('#fleetSeg button').forEach(b=>b.setAttribute('aria-pressed', b.dataset.f===k)); };
+  $('#fleetSeg').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; runToken++; show(b.dataset.f); };
+  while(my===runToken){ show(STEPS[i].id); i=(i+1)%STEPS.length; await wait(2600); } }
+
+/* ============ page 7: why ============ */
+function pageWhy(){
+  const S=SCEN[state.scen], P=PERSONA[state.persona], E=EVENT[state.event];
+  const rows=[['Prepare data','Move data between providers; track versions in spreadsheets.','Compute and storage in one Crusoe Cloud project; dataset versions in Managed MLflow.','data'],
+    ['Fine-tune','Build and babysit a GPU cluster, scheduler and node-failure recovery.','Serverless Fine-Tuning, or Managed Slurm and Crusoe Managed Kubernetes with AutoClusters.','finetune'],
+    ['Post-train with RL','Stitch together an inference engine, trainer, weight sync and reward services. Weeks before the first useful run.','Crusoe Managed RL: write the loop and reward in Python; sampling and training are managed.','rl'],
+    ['Evaluate & register','Host MLflow; promote by copying checkpoints.','Crusoe Managed MLflow with GenAI evaluation, registry aliases and lineage.','mlflow'],
+    ['Serve','Run and tune model servers, autoscaling and version rollouts.','Crusoe Managed Inference and Self-Serve Endpoints, powered by MemoryAlloy™ technology.','serve']];
+  const beats={
+    general:[['0:00','The problem',`${S.customer} Page 0, scenario card.`],['0:30','Play the flow','Press Play on page 0 and narrate each step as it lights up.'],['1:45','Managed RL',`Page 3. Let the loop run and walk one rollout's reward table.`],['3:00','Promote',`Page 4. ${S.ev.metric} from ${fmtV(S,0)} to ${fmtV(S,2)}, gates passed, alias moved.`],['3:45','Serve and loop','Page 5. Send a request, then point at the feedback path.']],
+    sglang:[['0:00','RL is an inference problem','Page 0, then page 6: sampling GPUs versus trainer GPUs.'],['1:30','The GRPO loop','Page 3. Narrate each call as it lights up: sample, reward, forward_backward, optim_step, new weights.'],['3:30','Groups and prefixes','Page 3, group chart. Eight rollouts share a prompt prefix; advantages come from the group mean.'],['5:00','Reward design',`Page 3, reward.py for ${S.name}. Verifiable rewards beat a learned judge when a checker exists.`],['6:30','Serving','Page 5. Cite the MemoryAlloy™ technology numbers.']],
+    kubecon:[['0:00','The platform view','Page 6. One fleet, five workloads, watch the grid change.'],['1:00','Two training paths','Page 2. Serverless Fine-Tuning versus a gang-scheduled job on Crusoe Managed Kubernetes.'],['2:30','What Managed RL removes','Page 3. The sampler fleet, trainer and weight sync are the workloads you no longer operate.'],['4:00','Declarative promotion','Page 4. Registry alias moves; the endpoint follows.'],['5:00','Observe','Page 5 and Command Center: endpoints, traces, usage.']]
+  }[state.event];
+  return `<section class="page">${head('Summary','Why build the whole lifecycle on Crusoe',`Most teams can fine-tune. Far fewer can run reinforcement learning, track it, and serve the result efficiently. Crusoe offers each step as a managed service on one cloud, with one API key.`)}
+    <div class="tablewrap"><table class="pitch"><thead><tr><th>Step</th><th>Building it alone</th><th>With Crusoe</th><th>For ${esc(P.label)}</th></tr></thead><tbody>
+      ${rows.map(r=>`<tr><td><a href="#${r[3]}">${r[0]}</a></td><td class="diy">${esc(r[1])}</td><td>${esc(r[2])}</td><td class="lens">${esc(P[r[3]])}</td></tr>`).join('')}</tbody></table></div>
+    <div><span class="eyebrow">Run of show</span><h2 style="margin-top:6px">${esc(E.ros)} · ${esc(S.name)}</h2></div>
+    <div class="ros">${beats.map(b=>`<div class="beat"><span class="tm">${b[0]}</span><h3>${esc(b[1])}</h3><p>${esc(b[2])}</p></div>`).join('')}</div>
+    <div><span class="eyebrow">Take it with you</span></div>
+    <div class="links">
+      <a class="lnk" href="https://github.com/crusoecloud/crusoe-developer-hub" target="_blank" rel="noopener"><h3>The code behind these steps</h3><p>Fine-tuning, Managed MLflow cookbooks, the Wordle GRPO recipe and more.</p><span>github.com/crusoecloud/crusoe-developer-hub</span></a>
+      <a class="lnk" href="https://console.crusoecloud.com/" target="_blank" rel="noopener"><h3>Get started on Crusoe</h3><p>Create an account, open a project, create an API key.</p><span>console.crusoecloud.com</span></a>
+      <a class="lnk" href="https://www.crusoe.ai/managed-mlflow/request" target="_blank" rel="noopener"><h3>Managed MLflow preview</h3><p>Request access to the private preview.</p><span>crusoe.ai/managed-mlflow/request</span></a>
+      <a class="lnk" href="https://discord.gg/tRKs5bMyry" target="_blank" rel="noopener"><h3>Developer community</h3><p>Questions, recipes and what other teams are training.</p><span>discord.gg/tRKs5bMyry</span></a>
+    </div>
+    ${pnav('why')}${FOOT}</section>`;
+}
+
+/* ============ router ============ */
+const RENDER = {flow:pageFlow, data:pageData, finetune:pageFinetune, rl:pageRL, mlflow:pageMlflow, serve:pageServe, platform:pagePlatform, why:pageWhy};
+function renderChrome(){
+  $('#tabs').innerHTML = PAGES.map(p=>`<a class="tab" href="#${p.id}" ${state.page===p.id?'aria-current="page"':''} style="text-decoration:none"><span class="num">${p.n}</span>${esc(p.t)}</a>`).join('');
+  const seg=(el,obj,key)=>{ el.innerHTML=Object.entries(obj).map(([k,v])=>`<button data-k="${k}" aria-pressed="${state[key]===k}">${esc(v.label)}</button>`).join('');
+    el.onclick=e=>{ const b=e.target.closest('button'); if(!b) return; state[key]=b.dataset.k; save(); renderChrome(); renderPage(); }; };
+  seg($('#segScen'), SCEN, 'scen'); seg($('#segPersona'), PERSONA, 'persona'); seg($('#segEvent'), EVENT, 'event');
+}
+function renderPage(){
+  runToken++;
+  $('#root').innerHTML = RENDER[state.page]();
+  const p = state.page;
+  if(p==='flow'){
+    narrate(state.flowSel); requestAnimationFrame(()=>drawArc(false));
+    document.querySelectorAll('.st').forEach(b=>b.onclick=()=>{ runToken++; state.flowSel=b.dataset.st; narrate(b.dataset.st); const btn=$('#playFlow'); if(btn) btn.textContent='▶ Play the flow'; });
+    $('#playFlow').onclick=()=>playFlow();
+    STEPS.forEach(s=>paintCells([...document.querySelector(`[data-gp="${s.id}"]`).querySelectorAll('i')], s.gpu));
+    document.querySelectorAll('.mlc').forEach(m=>m.classList.add('on'));
+    growBars(document);
+  }
+  if(p==='data') animPipe('#dpipe',5,1300);
+  if(p==='finetune') animFt();
+  if(p==='rl'){ animRL(); $('#rlRestart').onclick=()=>animRL(); }
+  if(p==='mlflow'){ growBars(document); animPipe('#mlpipe',6,1000); }
+  if(p==='serve'){ stream(); $('#sendBtn').onclick=stream; animPipe('#svpipe',5,1200); }
+  if(p==='platform') animFleet();
+}
+function route(){
+  const h = location.hash.replace('#','');
+  state.page = RENDER[h] ? h : 'flow';
+  renderChrome(); renderPage(); window.scrollTo(0,0);
+}
+addEventListener('hashchange', route);
+addEventListener('resize', ()=>{ if(state.page==='flow') drawArc($('#arc')?.classList.contains('lit')); });
+
+/* keyboard + tour */
+document.addEventListener('keydown', e=>{
+  if(e.target.closest('input,textarea,select')) return;
+  const i = PAGES.findIndex(p=>p.id===state.page);
+  if(/^[0-7]$/.test(e.key)) location.hash = PAGES[+e.key].id;
+  else if(e.key==='ArrowRight' && i<PAGES.length-1) location.hash = PAGES[i+1].id;
+  else if(e.key==='ArrowLeft' && i>0) location.hash = PAGES[i-1].id;
+  else if((e.key===' ') && state.page==='flow' && !e.target.closest('button,a')){ e.preventDefault(); playFlow(); }
+  else if(e.key==='f'||e.key==='F') document.documentElement.requestFullscreen?.().catch(()=>{});
+});
+let tourT=null;
+async function tour(){
+  const order=['flow','data','finetune','rl','mlflow','serve','platform'], dwell={data:14000,finetune:16000,rl:36000,mlflow:16000,serve:14000,platform:14000};
+  while(state.tour){
+    for(const pg of order){ if(!state.tour) return;
+      location.hash = pg; await new Promise(r=>setTimeout(r,50));
+      if(pg==='flow'){ await playFlow(); await new Promise(r=>tourT=setTimeout(r,4000)); }
+      else await new Promise(r=>tourT=setTimeout(r,dwell[pg]));
+    }
+    const ks=Object.keys(SCEN); state.scen=ks[(ks.indexOf(state.scen)+1)%ks.length]; renderChrome();
+  }
+}
+$('#tourBtn').onclick=e=>{ state.tour=!state.tour; e.currentTarget.setAttribute('aria-pressed',state.tour); e.currentTarget.textContent=state.tour?'Stop tour':'Tour'; clearTimeout(tourT); if(state.tour) tour(); };
+if('wakeLock' in navigator){ try{ navigator.wakeLock.request('screen').catch(()=>{}); }catch(e){} }
+
+route();
+</script>
+</body>
+</html>
