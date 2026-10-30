@@ -4,9 +4,13 @@ An interactive booth demo of the full model lifecycle on Crusoe Cloud: prepare d
 
 It is a single self-contained `index.html` with no build step.
 
+**Live site:** https://yenchiho.github.io/crusoe-ai-lifecycle-demo/
+
+Each page has its own link, for example [#rl](https://yenchiho.github.io/crusoe-ai-lifecycle-demo/#rl) for Managed RL, so you can share or bookmark a specific step.
+
 ## Run it
 
-Open `index.html` in a browser, or serve the folder:
+Every push to `main` redeploys the live site through `.github/workflows/pages.yml`. To run it locally instead, open `index.html` in a browser or serve the folder:
 
 ```bash
 python3 -m http.server 8000
